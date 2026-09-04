@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/php-client
+          - packages/composer-plugin
+          - cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+        working-directory: ${{ matrix.package }}
+      - run: vendor/bin/pest
+        working-directory: ${{ matrix.package }}
+
+  build-phar:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - name: Install with the client mirrored into vendor
+        working-directory: cli
+        run: composer install --no-interaction --prefer-dist
+        env:
+          COMPOSER_MIRROR_PATH_REPOS: '1'
+      - name: Prune dev artifacts from the mirrored client
+        working-directory: cli
+        run: rm -rf vendor/vaults/php-client/vendor vendor/vaults/php-client/tests vendor/vaults/php-client/.git
+      - name: Build PHAR
+        working-directory: cli
+        run: php vaults app:build vaults --build-version=${GITHUB_REF_NAME#v} --no-interaction
+      - name: Assert the client library is bundled
+        working-directory: cli
+        run: |
+          cp builds/vaults /tmp/vaults-assert.phar
+          php -r '$phar = new Phar("/tmp/vaults-assert.phar"); exit(isset($phar["vendor/vaults/php-client/src/VaultsClient.php"]) ? 0 : 1);'
+          php builds/vaults --version
+      - name: Attach PHAR to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cli/builds/vaults
+          generate_release_notes: true
+
+  split-client:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: symplify/monorepo-split-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_REPO_TOKEN }}
+        with:
+          tag: ${{ github.ref_name }}
+          package_directory: 'packages/php-client'
+          repository_organization: 'vaults-sh'
+          repository_name: 'php-client'
+          user_name: 'vaults-release-bot'
+          user_email: 'release@vaults.sh'
+
+  split-plugin:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rewrite composer.json for publication
+        working-directory: packages/composer-plugin
+        run: |
+          jq 'del(.repositories) | .require["vaults/php-client"] = ">=0.1 <1.0"' composer.json > composer.json.tmp
+          mv composer.json.tmp composer.json
+      - uses: symplify/monorepo-split-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_REPO_TOKEN }}
+        with:
+          tag: ${{ github.ref_name }}
+          package_directory: 'packages/composer-plugin'
+          repository_organization: 'vaults-sh'
+          repository_name: 'composer-plugin'
+          user_name: 'vaults-release-bot'
+          user_email: 'release@vaults.sh'

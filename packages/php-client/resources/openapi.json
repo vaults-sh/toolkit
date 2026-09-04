@@ -1,0 +1,1441 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Vaults",
+        "version": "0.0.1"
+    },
+    "servers": [
+        {
+            "url": "https://vaults.test/api"
+        }
+    ],
+    "security": [
+        {
+            "http": []
+        }
+    ],
+    "paths": {
+        "/v1/projects/{project}/protect/check": {
+            "post": {
+                "operationId": "v1.projects.protect-check",
+                "tags": [
+                    "CheckProjectProtection"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "`ProtectProjectData`",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProtectProjectData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ProtectionCheckResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ProtectionCheckResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/device-codes": {
+            "post": {
+                "operationId": "v1.device-codes.store",
+                "tags": [
+                    "CreateDeviceCode"
+                ],
+                "requestBody": {
+                    "description": "`CreateDeviceCodeData`",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateDeviceCodeData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`DeviceCodeIssuedResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DeviceCodeIssuedResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/projects": {
+            "post": {
+                "operationId": "v1.projects.store",
+                "tags": [
+                    "CreateProject"
+                ],
+                "requestBody": {
+                    "description": "`CreateProjectData`",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateProjectData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ProjectResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "get": {
+                "operationId": "v1.projects.index",
+                "tags": [
+                    "GetProjects"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ProjectResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/artifacts": {
+            "get": {
+                "operationId": "v1.artifacts.index",
+                "tags": [
+                    "GetArtifacts"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ArtifactResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "allOf": [
+                                                    {
+                                                        "$ref": "#/components/schemas/ArtifactResource"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "replicas"
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/packages": {
+            "get": {
+                "operationId": "v1.packages.index",
+                "tags": [
+                    "GetPackages"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `PackageResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "allOf": [
+                                                    {
+                                                        "$ref": "#/components/schemas/PackageResource"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "versions"
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/protection-runs/{protectionRun}": {
+            "get": {
+                "operationId": "v1.protection-runs.show",
+                "tags": [
+                    "GetProtectionRun"
+                ],
+                "parameters": [
+                    {
+                        "name": "protectionRun",
+                        "in": "path",
+                        "required": true,
+                        "description": "The protection run UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ProtectionRunResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/ProtectionRunResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "items"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/protection-runs/{protectionRun}/lock": {
+            "get": {
+                "operationId": "v1.protection-runs.lock",
+                "tags": [
+                    "GetRewrittenLock"
+                ],
+                "parameters": [
+                    {
+                        "name": "protectionRun",
+                        "in": "path",
+                        "required": true,
+                        "description": "The protection run UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "composer_lock": {
+                                            "type": "string"
+                                        },
+                                        "repositories": {
+                                            "type": "object",
+                                            "properties": {
+                                                "project": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "const": "composer"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "type",
+                                                        "url"
+                                                    ]
+                                                },
+                                                "global": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "const": "composer"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        },
+                                                        "canonical": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "type",
+                                                        "url",
+                                                        "canonical"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "project",
+                                                "global"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "composer_lock",
+                                        "repositories"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/token": {
+            "get": {
+                "operationId": "v1.token.show",
+                "tags": [
+                    "GetToken"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`TokenResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TokenResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/ping": {
+            "get": {
+                "operationId": "v1.ping",
+                "tags": [
+                    "Ping"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`PingResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PingResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/device-codes/poll": {
+            "post": {
+                "operationId": "v1.device-codes.poll",
+                "tags": [
+                    "PollDeviceCode"
+                ],
+                "requestBody": {
+                    "description": "`PollDeviceCodeData`",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PollDeviceCodeData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`DeviceCodePollResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DeviceCodePollResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "`DeviceCodePollResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DeviceCodePollResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/projects/{project}/protect": {
+            "post": {
+                "operationId": "v1.projects.protect",
+                "tags": [
+                    "ProtectProject"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project UUID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "`ProtectProjectData`",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProtectProjectData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "`ProtectionRunResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ProtectionRunResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "http": {
+                "type": "http",
+                "description": "Team API token, issued from team settings or the CLI device login flow.",
+                "scheme": "bearer"
+            }
+        },
+        "schemas": {
+            "ArtifactReplicaResource": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string"
+                    },
+                    "verified": {
+                        "type": "boolean"
+                    },
+                    "verified_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "provider",
+                    "verified",
+                    "verified_at"
+                ],
+                "title": "ArtifactReplicaResource"
+            },
+            "ArtifactResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "sha256": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "integer"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "replicas": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ArtifactReplicaResource"
+                        }
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "sha256",
+                    "size",
+                    "mime_type",
+                    "created_at"
+                ],
+                "title": "ArtifactResource"
+            },
+            "CreateDeviceCodeData": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    }
+                },
+                "title": "CreateDeviceCodeData"
+            },
+            "CreateProjectData": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "repository_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "CreateProjectData"
+            },
+            "DeviceCodeIssuedResource": {
+                "type": "object",
+                "properties": {
+                    "device_code": {
+                        "type": "string"
+                    },
+                    "user_code": {
+                        "type": "string"
+                    },
+                    "verification_uri": {
+                        "type": "string"
+                    },
+                    "verification_uri_complete": {
+                        "type": "string"
+                    },
+                    "expires_in": {
+                        "type": "string"
+                    },
+                    "interval": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "device_code",
+                    "user_code",
+                    "verification_uri",
+                    "verification_uri_complete",
+                    "expires_in",
+                    "interval"
+                ],
+                "title": "DeviceCodeIssuedResource"
+            },
+            "DeviceCodePollResource": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "token": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "team": {
+                        "type": "object",
+                        "properties": {
+                            "uuid": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "uuid",
+                            "name"
+                        ]
+                    }
+                },
+                "required": [
+                    "status"
+                ],
+                "title": "DeviceCodePollResource"
+            },
+            "PackageResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "versions": {
+                        "type": "array",
+                        "items": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/PackageVersionResource"
+                                },
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "artifact"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "name"
+                ],
+                "title": "PackageResource"
+            },
+            "PackageVersionResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "sha256": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "security_status": {
+                        "type": "string"
+                    },
+                    "protected": {
+                        "type": "boolean"
+                    },
+                    "artifact": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ArtifactResource"
+                            },
+                            {
+                                "type": "object",
+                                "required": [
+                                    "replicas"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "version",
+                    "reference",
+                    "sha256",
+                    "security_status",
+                    "protected"
+                ],
+                "title": "PackageVersionResource"
+            },
+            "PingResource": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "const": "ok"
+                    }
+                },
+                "required": [
+                    "status"
+                ],
+                "title": "PingResource"
+            },
+            "PollDeviceCodeData": {
+                "type": "object",
+                "properties": {
+                    "device_code": {
+                        "type": "string",
+                        "maxLength": 128
+                    }
+                },
+                "required": [
+                    "device_code"
+                ],
+                "title": "PollDeviceCodeData"
+            },
+            "ProjectResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "repository_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "repository": {
+                        "type": "string"
+                    },
+                    "repository_published": {
+                        "type": "boolean"
+                    },
+                    "protection_percentage": {
+                        "type": "integer"
+                    },
+                    "latest_run": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ProtectionRunResource"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "name",
+                    "description",
+                    "repository_url",
+                    "repository",
+                    "repository_published",
+                    "protection_percentage",
+                    "created_at"
+                ],
+                "title": "ProjectResource"
+            },
+            "ProtectProjectData": {
+                "type": "object",
+                "properties": {
+                    "composer_lock": {
+                        "type": "string",
+                        "maxLength": 10485760
+                    }
+                },
+                "required": [
+                    "composer_lock"
+                ],
+                "title": "ProtectProjectData"
+            },
+            "ProtectionCheckResource": {
+                "type": "object",
+                "properties": {
+                    "total": {
+                        "type": "integer"
+                    },
+                    "protected": {
+                        "type": "integer"
+                    },
+                    "unprotected": {
+                        "type": "integer"
+                    },
+                    "packages": {
+                        "type": "array",
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "total",
+                    "protected",
+                    "unprotected",
+                    "packages"
+                ],
+                "title": "ProtectionCheckResource"
+            },
+            "ProtectionRunItemResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "package": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "security_status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "status",
+                    "error",
+                    "package",
+                    "version",
+                    "reference",
+                    "security_status"
+                ],
+                "title": "ProtectionRunItemResource"
+            },
+            "ProtectionRunResource": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "packages_total": {
+                        "type": "integer"
+                    },
+                    "packages_protected": {
+                        "type": "integer"
+                    },
+                    "packages_failed": {
+                        "type": "integer"
+                    },
+                    "packages_skipped": {
+                        "type": "integer"
+                    },
+                    "started_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "finished_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProtectionRunItemResource"
+                        }
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "status",
+                    "packages_total",
+                    "packages_protected",
+                    "packages_failed",
+                    "packages_skipped",
+                    "started_at",
+                    "finished_at",
+                    "created_at"
+                ],
+                "title": "ProtectionRunResource"
+            },
+            "TokenResource": {
+                "type": "object",
+                "properties": {
+                    "team": {
+                        "type": "object",
+                        "properties": {
+                            "uuid": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "uuid",
+                            "name"
+                        ]
+                    }
+                },
+                "required": [
+                    "team"
+                ],
+                "title": "TokenResource"
+            }
+        },
+        "responses": {
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ModelNotFoundException": {
+                "description": "Not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

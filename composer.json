@@ -1,0 +1,7 @@
+{
+    "name": "vaults/toolkit",
+    "description": "Monorepo for the Vaults client tooling: the PHP client library, the Composer plugin, and the CLI.",
+    "type": "project",
+    "license": "MIT",
+    "keywords": ["vaults", "composer", "mirror", "resilience", "monorepo"]
+}

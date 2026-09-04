@@ -1,0 +1,74 @@
+{
+    "name": "vaults/cli",
+    "description": "The Vaults CLI.",
+    "keywords": [
+        "framework",
+        "laravel",
+        "laravel zero",
+        "console",
+        "cli"
+    ],
+    "homepage": "https://laravel-zero.com",
+    "type": "project",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/vaults-sh/toolkit/issues",
+        "source": "https://github.com/vaults-sh/toolkit"
+    },
+    "authors": [
+        {
+            "name": "Nuno Maduro",
+            "email": "enunomaduro@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "vaults/php-client": "@dev",
+        "laravel-zero/foundation": "^13.23",
+        "laravel-zero/framework": "^13.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30.4",
+        "mockery/mockery": "^1.6.12",
+        "pestphp/pest": "^4.7.8 || ^5.0.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "bin": [
+        "vaults"
+    ],
+    "repositories": [
+        {
+            "name": "vaults-client",
+            "type": "path",
+            "url": "../packages/php-client"
+        }
+    ],
+    "scripts": {
+        "build": [
+            "COMPOSER_MIRROR_PATH_REPOS=1 composer update vaults/php-client --no-interaction",
+            "rm -rf vendor/vaults/php-client/vendor vendor/vaults/php-client/tests vendor/vaults/php-client/.git",
+            "@php vaults app:build vaults --no-interaction"
+        ]
+    }
+}

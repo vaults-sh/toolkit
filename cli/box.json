@@ -1,0 +1,23 @@
+{
+    "chmod": "0755",
+    "directories": [
+        "app",
+        "bootstrap",
+        "config",
+        "vendor"
+    ],
+    "blacklist": [
+        "vendor/vaults/php-client/vendor",
+        "vendor/vaults/php-client/tests",
+        "vendor/vaults/php-client/.git"
+    ],
+    "files": [
+        "composer.json"
+    ],
+    "exclude-composer-files": false,
+    "compression": "GZ",
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\Php",
+        "KevinGH\\Box\\Compactor\\Json"
+    ]
+}
