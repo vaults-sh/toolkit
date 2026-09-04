@@ -8,7 +8,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Tests\Support\FakeIO;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
-use Vaults\ComposerPlugin\ProtectCommand;
+use Vaults\ComposerPlugin\DepositCommand;
 use Vaults\ComposerPlugin\VaultsPlugin;
 use Vaults\Support\FakeSleeper;
 use Vaults\VaultsClient;
@@ -22,7 +22,7 @@ beforeEach(function () {
     $this->store->save('test-token');
     $this->io = new FakeIO;
 
-    $command = new ProtectCommand(
+    $command = new DepositCommand(
         new VaultsClient(null, 'https://vaults.test', $this->transport, 'https://auth.vaults.test'),
         $this->store,
         $this->workDir,
@@ -34,43 +34,43 @@ beforeEach(function () {
     $this->tester = new CommandTester($command);
 });
 
-it('exposes the protect command through the plugin capability', function () {
+it('exposes the deposit command through the plugin capability', function () {
     $plugin = new VaultsPlugin;
     $provider = new (array_values($plugin->getCapabilities())[0]);
 
-    expect($provider->getCommands()[0])->toBeInstanceOf(ProtectCommand::class);
+    expect($provider->getCommands()[0])->toBeInstanceOf(DepositCommand::class);
 });
 
-it('checks protection with a ci-friendly exit code', function () {
+it('checks deposit with a ci-friendly exit code', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => [
         'total' => 2,
-        'protected' => 1,
-        'unprotected' => 1,
+        'deposited' => 1,
+        'undeposited' => 1,
         'packages' => [
-            ['name' => 'a/b', 'version' => 'v1.0.0', 'protected' => true, 'security_status' => 'clear'],
-            ['name' => 'c/d', 'version' => 'v2.0.0', 'protected' => false, 'security_status' => null],
+            ['name' => 'a/b', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear'],
+            ['name' => 'c/d', 'version' => 'v2.0.0', 'deposited' => false, 'security_status' => null],
         ],
     ]]);
 
     $exit = $this->tester->execute(['--check' => true]);
 
     expect($exit)->toBe(1)
-        ->and($this->tester->getDisplay())->toContain('1/2 protected, 1 unprotected.');
+        ->and($this->tester->getDisplay())->toContain('1/2 deposited, 1 undeposited.');
 
     $authorization = $this->transport->requests[0]->headers['Authorization'] ?? null;
 
     expect($authorization)->toBe('Bearer test-token');
 });
 
-it('runs a full protection and writes the lock', function () {
+it('runs a full deposit and writes the lock', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 1]], 202);
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]]);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[],"rewritten":true}',
         'repositories' => [
@@ -114,9 +114,9 @@ it('logs in via the device flow when interactive and unauthenticated', function 
     $this->transport->queueJson(['data' => ['status' => 'approved', 'token' => 'issued-token', 'team' => ['uuid' => 'u', 'name' => 'Cranbri']]]);
     $this->transport->queueJson(['data' => [
         'total' => 1,
-        'protected' => 1,
-        'unprotected' => 0,
-        'packages' => [['name' => 'a/b', 'version' => 'v1.0.0', 'protected' => true, 'security_status' => 'clear']],
+        'deposited' => 1,
+        'undeposited' => 0,
+        'packages' => [['name' => 'a/b', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear']],
     ]]);
 
     $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
@@ -124,7 +124,7 @@ it('logs in via the device flow when interactive and unauthenticated', function 
     expect($exit)->toBe(0)
         ->and($this->tester->getDisplay())->toContain('ABCD-EFGH')
         ->and($this->tester->getDisplay())->toContain('Logged in to team: Cranbri')
-        ->and($this->tester->getDisplay())->toContain('All packages are protected.')
+        ->and($this->tester->getDisplay())->toContain('All packages are deposited.')
         ->and($this->store->token())->toBe('issued-token');
 });
 
@@ -133,8 +133,8 @@ it('persists the project link when --project is passed', function () {
 
     $this->transport->queueJson(['data' => [
         'total' => 0,
-        'protected' => 0,
-        'unprotected' => 0,
+        'deposited' => 0,
+        'undeposited' => 0,
         'packages' => [],
     ]]);
 
@@ -162,7 +162,7 @@ it('links interactively by creating a project when none exist', function () {
 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'my-app']], 201);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
     $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
 
@@ -181,7 +181,7 @@ it('normalises a typed project name and retries when the dashboard rejects it', 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['message' => 'A project with this name already exists in this team.', 'errors' => ['name' => ['A project with this name already exists in this team.']]], 422);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api-2']], 201);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
     $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
 
@@ -220,7 +220,7 @@ it('links interactively by selecting an existing project', function () {
     $this->io->queue(1);
 
     $this->transport->queueJson(['data' => [['uuid' => 'existing-uuid', 'name' => 'Existing App']]]);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
     $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
 
@@ -229,14 +229,14 @@ it('links interactively by selecting an existing project', function () {
         ->and(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'existing-uuid']);
 });
 
-it('wires the repository into composer.json after an interactive protect', function () {
+it('wires the repository into composer.json after an interactive deposit', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"cranbri/my-app\"\n}\n");
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->io->queue(true);
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
@@ -272,7 +272,7 @@ it('skips the wiring offer when the repository is already configured', function 
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
@@ -295,7 +295,7 @@ it('refreshes the lock content hash to match the wired composer.json', function 
 
     $this->io->queue(true);
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": []}',
         'repositories' => [

@@ -1,6 +1,6 @@
 {
     "name": "vaults/composer-plugin",
-    "description": "composer protect: protect your composer.lock with Vaults resilient Composer infrastructure",
+    "description": "composer deposit: deposit your composer.lock with Vaults resilient Composer infrastructure",
     "license": "MIT",
     "type": "composer-plugin",
     "keywords": ["vaults", "composer", "plugin", "mirror", "resilience"],

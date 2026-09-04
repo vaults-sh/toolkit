@@ -16,8 +16,8 @@ final readonly class Project
         public ?string $repositoryUrl,
         public array $repositorySnippet,
         public bool $repositoryPublished,
-        public float $protectionPercentage,
-        public ?ProtectionRun $latestRun,
+        public float $depositPercentage,
+        public ?DepositRun $latestRun,
     ) {}
 
     /**
@@ -34,8 +34,8 @@ final readonly class Project
             is_string($data['repository_url'] ?? null) ? $data['repository_url'] : null,
             is_array($data['repository'] ?? null) ? $data['repository'] : [],
             (bool) ($data['repository_published'] ?? false),
-            (float) ($data['protection_percentage'] ?? 0),
-            is_array($latestRun) ? ProtectionRun::fromArray($latestRun) : null,
+            (float) ($data['deposit_percentage'] ?? 0),
+            is_array($latestRun) ? DepositRun::fromArray($latestRun) : null,
         );
     }
 }

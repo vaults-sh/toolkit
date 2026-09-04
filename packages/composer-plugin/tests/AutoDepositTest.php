@@ -48,7 +48,7 @@ function updateEvent(array $extra = []): Event
 
 beforeEach(function () {
     $this->transport = new FakeTransport;
-    $this->workDir = sys_get_temp_dir().'/vaults-autoprotect-tests/'.uniqid();
+    $this->workDir = sys_get_temp_dir().'/vaults-autodeposit-tests/'.uniqid();
     mkdir($this->workDir, 0755, true);
     $this->store = new TokenStore($this->workDir.'/config.json');
 });
@@ -57,7 +57,7 @@ it('subscribes to the post-update event', function () {
     expect(VaultsPlugin::getSubscribedEvents())->toHaveKey(ScriptEvents::POST_UPDATE_CMD);
 });
 
-it('fires a protection run after update when linked and authenticated', function () {
+it('fires a deposit run after update when linked and authenticated', function () {
     $this->store->save('test-token');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
@@ -68,7 +68,7 @@ it('fires a protection run after update when linked and authenticated', function
 
     $request = $this->transport->requests[0] ?? null;
 
-    expect($request?->url)->toBe('https://vaults.test/api/v1/projects/project-uuid/protect')
+    expect($request?->url)->toBe('https://vaults.test/api/v1/projects/project-uuid/deposit')
         ->and($request?->headers['Authorization'])->toBe('Bearer test-token');
 });
 
@@ -90,13 +90,13 @@ it('does nothing when not linked to a project', function () {
     expect($this->transport->requests)->toBeEmpty();
 });
 
-it('respects the auto-protect opt-out', function () {
+it('respects the auto-deposit opt-out', function () {
     $this->store->save('test-token');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
     testablePlugin($this->transport, $this->store, $this->workDir)
-        ->onPostUpdate(updateEvent(['vaults' => ['auto-protect' => false]]));
+        ->onPostUpdate(updateEvent(['vaults' => ['auto-deposit' => false]]));
 
     expect($this->transport->requests)->toBeEmpty();
 });

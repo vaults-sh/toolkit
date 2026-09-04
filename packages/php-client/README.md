@@ -22,7 +22,7 @@ if ($result->isApproved()) {
     $store->save($result->token, $result->team);
 }
 
-$run = $client->withToken($result->token)->protect($projectUuid, file_get_contents('composer.lock'));
+$run = $client->withToken($result->token)->deposit($projectUuid, file_get_contents('composer.lock'));
 ```
 
 - Base URL: defaults to production; override with the `VAULTS_API_URL` environment variable or the constructor.

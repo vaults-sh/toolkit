@@ -9,7 +9,7 @@ final readonly class CheckPackage
     public function __construct(
         public string $name,
         public string $version,
-        public bool $protected,
+        public bool $deposited,
         public ?string $securityStatus,
     ) {}
 
@@ -21,7 +21,7 @@ final readonly class CheckPackage
         return new self(
             (string) ($data['name'] ?? ''),
             (string) ($data['version'] ?? ''),
-            (bool) ($data['protected'] ?? false),
+            (bool) ($data['deposited'] ?? false),
             is_string($data['security_status'] ?? null) ? $data['security_status'] : null,
         );
     }

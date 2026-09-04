@@ -48,13 +48,13 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
     public function onPostUpdate(Event $event): void
     {
         try {
-            $this->autoProtect($event);
+            $this->autoDeposit($event);
         } catch (Throwable) {
-            // Auto-protect is best-effort; never break a composer update.
+            // Auto-deposit is best-effort; never break a composer update.
         }
     }
 
-    private function autoProtect(Event $event): void
+    private function autoDeposit(Event $event): void
     {
         $io = $event->getIO();
         $directory = $this->workingDirectory();
@@ -76,9 +76,9 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
             return;
         }
 
-        $run = $this->client()->withToken($token)->protect($projectUuid, (string) file_get_contents($lockPath));
+        $run = $this->client()->withToken($token)->deposit($projectUuid, (string) file_get_contents($lockPath));
 
-        $io->write('<info>Vaults:</info> protecting '.$run->packagesTotal.' packages in the background. Run "composer protect --write" to pin composer.lock to Vaults.');
+        $io->write('<info>Vaults:</info> depositing '.$run->packagesTotal.' packages in the background. Run "composer deposit --write" to pin composer.lock to Vaults.');
     }
 
     protected function workingDirectory(): string
@@ -100,6 +100,6 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
     {
         $extra = $event->getComposer()->getPackage()->getExtra();
 
-        return isset($extra['vaults']['auto-protect']) && $extra['vaults']['auto-protect'] === false;
+        return isset($extra['vaults']['auto-deposit']) && $extra['vaults']['auto-deposit'] === false;
     }
 }

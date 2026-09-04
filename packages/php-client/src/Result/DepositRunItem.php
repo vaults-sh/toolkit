@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Vaults\Result;
 
-final readonly class ProtectionRunItem
+final readonly class DepositRunItem
 {
     public function __construct(
         public string $uuid,

@@ -17,14 +17,14 @@ class InitCommand extends Command
 
     protected $signature = 'init {--project= : Project UUID (skips the interactive picker)}';
 
-    protected $description = 'Link this directory to a Vaults project without protecting anything yet';
+    protected $description = 'Link this directory to a Vaults project without depositing anything yet';
 
     public function handle(VaultsClient $client, ProjectManifest $manifest): int
     {
         $directory = (string) getcwd();
 
         if ($manifest->load($directory) !== null && ! $this->option('project')) {
-            $this->info('This directory is already linked (.vaults.json). Run vaults status or vaults protect --check.');
+            $this->info('This directory is already linked (.vaults.json). Run vaults status or vaults deposit --check.');
 
             return self::SUCCESS;
         }
@@ -45,7 +45,7 @@ class InitCommand extends Command
             return self::FAILURE;
         }
 
-        $this->line('Next: vaults protect --check to see what needs protecting, or vaults protect to protect everything.');
+        $this->line('Next: vaults deposit --check to see what needs depositing, or vaults deposit to deposit everything.');
 
         return self::SUCCESS;
     }

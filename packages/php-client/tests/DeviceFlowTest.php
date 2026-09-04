@@ -7,6 +7,7 @@ use Vaults\Auth\DeviceFlow;
 use Vaults\Result\DeviceCodePair;
 use Vaults\Support\FakeClock;
 use Vaults\Support\FakeSleeper;
+use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
 
 function pair(int $expiresIn = 900, int $interval = 5): DeviceCodePair
@@ -62,7 +63,7 @@ it('gives up locally once the pair lifetime has passed', function () {
     $transport->queueJson(['data' => ['status' => 'pending']]);
 
     $clock = new FakeClock(1_000);
-    $sleeper = new class($clock) implements \Vaults\Support\Sleeper
+    $sleeper = new class($clock) implements Sleeper
     {
         public function __construct(private FakeClock $clock) {}
 

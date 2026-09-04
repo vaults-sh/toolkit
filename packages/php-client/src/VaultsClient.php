@@ -7,10 +7,10 @@ namespace Vaults;
 use Vaults\Exception\ApiException;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Result\CheckResult;
+use Vaults\Result\DepositRun;
 use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
 use Vaults\Result\Project;
-use Vaults\Result\ProtectionRun;
 use Vaults\Result\RewrittenLock;
 use Vaults\Result\TeamIdentity;
 use Vaults\Transport\HttpRequest;
@@ -110,28 +110,28 @@ final class VaultsClient
         return Project::fromArray($this->request('POST', '/api/v1/projects', $payload));
     }
 
-    public function protect(string $projectUuid, string $composerLock): ProtectionRun
+    public function deposit(string $projectUuid, string $composerLock): DepositRun
     {
-        return ProtectionRun::fromArray(
-            $this->request('POST', '/api/v1/projects/'.$projectUuid.'/protect', ['composer_lock' => $composerLock]),
+        return DepositRun::fromArray(
+            $this->request('POST', '/api/v1/projects/'.$projectUuid.'/deposit', ['composer_lock' => $composerLock]),
         );
     }
 
-    public function protectCheck(string $projectUuid, string $composerLock): CheckResult
+    public function depositCheck(string $projectUuid, string $composerLock): CheckResult
     {
         return CheckResult::fromArray(
-            $this->request('POST', '/api/v1/projects/'.$projectUuid.'/protect/check', ['composer_lock' => $composerLock]),
+            $this->request('POST', '/api/v1/projects/'.$projectUuid.'/deposit/check', ['composer_lock' => $composerLock]),
         );
     }
 
-    public function getRun(string $runUuid): ProtectionRun
+    public function getRun(string $runUuid): DepositRun
     {
-        return ProtectionRun::fromArray($this->request('GET', '/api/v1/protection-runs/'.$runUuid));
+        return DepositRun::fromArray($this->request('GET', '/api/v1/deposit-runs/'.$runUuid));
     }
 
     public function getRewrittenLock(string $runUuid): RewrittenLock
     {
-        $response = $this->send('GET', '/api/v1/protection-runs/'.$runUuid.'/lock');
+        $response = $this->send('GET', '/api/v1/deposit-runs/'.$runUuid.'/lock');
         $this->guard($response);
 
         return RewrittenLock::fromArray($response->json());

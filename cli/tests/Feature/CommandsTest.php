@@ -56,49 +56,49 @@ it('logs out', function () {
     expect($this->tokenStore->token())->toBeNull();
 });
 
-it('checks protection status with a ci-friendly exit code', function () {
+it('checks deposit status with a ci-friendly exit code', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => [
         'total' => 2,
-        'protected' => 1,
-        'unprotected' => 1,
+        'deposited' => 1,
+        'undeposited' => 1,
         'packages' => [
-            ['name' => 'a/b', 'version' => 'v1.0.0', 'protected' => true, 'security_status' => 'clear'],
-            ['name' => 'c/d', 'version' => 'v2.0.0', 'protected' => false, 'security_status' => null],
+            ['name' => 'a/b', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear'],
+            ['name' => 'c/d', 'version' => 'v2.0.0', 'deposited' => false, 'security_status' => null],
         ],
     ]]);
 
-    $this->artisan('protect', ['--check' => true])
-        ->expectsOutputToContain('1/2 protected, 1 unprotected.')
+    $this->artisan('deposit', ['--check' => true])
+        ->expectsOutputToContain('1/2 deposited, 1 undeposited.')
         ->assertExitCode(1);
 });
 
-it('reports success when everything is protected', function () {
+it('reports success when everything is deposited', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => [
         'total' => 1,
-        'protected' => 1,
-        'unprotected' => 0,
+        'deposited' => 1,
+        'undeposited' => 0,
         'packages' => [
-            ['name' => 'a/b', 'version' => 'v1.0.0', 'protected' => true, 'security_status' => 'clear'],
+            ['name' => 'a/b', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear'],
         ],
     ]]);
 
-    $this->artisan('protect', ['--check' => true])
-        ->expectsOutputToContain('All packages are protected.')
+    $this->artisan('deposit', ['--check' => true])
+        ->expectsOutputToContain('All packages are deposited.')
         ->assertExitCode(0);
 });
 
-it('runs a full protection and writes the lock with --write', function () {
+it('runs a full deposit and writes the lock with --write', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 1]], 202);
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]]);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[],"rewritten":true}',
         'repositories' => [
@@ -107,7 +107,7 @@ it('runs a full protection and writes the lock with --write', function () {
         ],
     ]);
 
-    $this->artisan('protect', ['--write' => true])
+    $this->artisan('deposit', ['--write' => true])
         ->expectsConfirmation('Add it now?', 'no')
         ->expectsOutputToContain('composer.lock rewritten to install from Vaults')
         ->expectsOutputToContain('repositories')
@@ -117,7 +117,7 @@ it('runs a full protection and writes the lock with --write', function () {
 });
 
 it('errors without a composer.lock', function () {
-    $this->artisan('protect', ['--check' => true])
+    $this->artisan('deposit', ['--check' => true])
         ->expectsOutputToContain('No composer.lock found')
         ->assertExitCode(1);
 });
@@ -129,8 +129,8 @@ it('shows project status from the manifest', function () {
         'uuid' => 'project-uuid',
         'name' => 'Vaults App',
         'repository_published' => true,
-        'protection_percentage' => 98.5,
-        'latest_run' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 240, 'packages_protected' => 238],
+        'deposit_percentage' => 98.5,
+        'latest_run' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 240, 'packages_deposited' => 238],
     ]]]);
 
     $this->artisan('status')
@@ -151,9 +151,9 @@ it('links interactively by creating a project when none exist', function () {
 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'my-app']], 201);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
-    $this->artisan('protect', ['--check' => true])
+    $this->artisan('deposit', ['--check' => true])
         ->expectsQuestion('What should the new project be called?', 'my-app')
         ->expectsOutputToContain('Linked this directory to "my-app"')
         ->assertExitCode(0);
@@ -166,9 +166,9 @@ it('normalises a typed project name before creating it', function () {
 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api']], 201);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
-    $this->artisan('protect', ['--check' => true])
+    $this->artisan('deposit', ['--check' => true])
         ->expectsQuestion('What should the new project be called?', 'Checkout API')
         ->expectsOutputToContain('Linked this directory to "checkout-api"')
         ->assertExitCode(0);
@@ -182,9 +182,9 @@ it('asks again when the dashboard rejects the project name', function () {
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['message' => 'A project with this name already exists in this team.', 'errors' => ['name' => ['A project with this name already exists in this team.']]], 422);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api-2']], 201);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
-    $this->artisan('protect', ['--check' => true])
+    $this->artisan('deposit', ['--check' => true])
         ->expectsQuestion('What should the new project be called?', 'checkout-api')
         ->expectsOutputToContain('already exists in this team')
         ->expectsQuestion('What should the new project be called?', 'checkout-api-2')
@@ -218,9 +218,9 @@ it('links interactively by selecting an existing project', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
     $this->transport->queueJson(['data' => [['uuid' => 'existing-uuid', 'name' => 'Existing App']]]);
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
-    $this->artisan('protect', ['--check' => true])
+    $this->artisan('deposit', ['--check' => true])
         ->expectsQuestion('Which Vaults project should this directory belong to?', 'existing-uuid')
         ->expectsOutputToContain('Linked this directory to "Existing App"')
         ->assertExitCode(0);
@@ -231,19 +231,19 @@ it('links interactively by selecting an existing project', function () {
 it('persists the project link when --project is passed', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
-    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+    $this->transport->queueJson(['data' => ['total' => 0, 'deposited' => 0, 'undeposited' => 0, 'packages' => []]]);
 
-    $this->artisan('protect', ['--check' => true, '--project' => 'flag-uuid'])
+    $this->artisan('deposit', ['--check' => true, '--project' => 'flag-uuid'])
         ->expectsOutputToContain('.vaults.json written')
         ->assertExitCode(0);
 
     expect(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'flag-uuid']);
 });
 
-it('fails protect without a link when non-interactive', function () {
+it('fails deposit without a link when non-interactive', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
-    $this->artisan('protect', ['--check' => true, '--no-interaction' => true])
+    $this->artisan('deposit', ['--check' => true, '--no-interaction' => true])
         ->expectsOutputToContain('not linked to a Vaults project')
         ->assertExitCode(1);
 });
@@ -256,7 +256,7 @@ it('initialises a directory via vaults init', function () {
 
     $this->artisan('init')
         ->expectsQuestion('What should the new project be called?', 'fresh-app')
-        ->expectsOutputToContain('Next: vaults protect --check')
+        ->expectsOutputToContain('Next: vaults deposit --check')
         ->assertExitCode(0);
 
     expect(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'fresh-uuid']);
@@ -270,7 +270,7 @@ it('does nothing when init runs in an already linked directory', function () {
         ->assertExitCode(0);
 });
 
-it('offers to wire composer.json after an interactive protect', function () {
+it('offers to wire composer.json after an interactive deposit', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
@@ -287,7 +287,7 @@ it('offers to wire composer.json after an interactive protect', function () {
     };
     $this->app->instance(ComposerConfigWriter::class, $writer);
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
@@ -296,7 +296,7 @@ it('offers to wire composer.json after an interactive protect', function () {
         ],
     ]);
 
-    $this->artisan('protect')
+    $this->artisan('deposit')
         ->expectsConfirmation('Add it now?', 'yes')
         ->expectsOutputToContain('composer.json updated')
         ->assertExitCode(0);
@@ -342,7 +342,7 @@ it('skips the wiring offer when the repository is already configured', function 
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
@@ -351,7 +351,7 @@ it('skips the wiring offer when the repository is already configured', function 
         ],
     ]);
 
-    $this->artisan('protect')
+    $this->artisan('deposit')
         ->expectsOutputToContain('already configured in composer.json')
         ->assertExitCode(0);
 });
@@ -361,8 +361,8 @@ it('waits for the real package total before showing progress', function () {
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 0]], 202);
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 2, 'packages_protected' => 1]]);
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 2, 'packages_protected' => 2]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 2, 'packages_deposited' => 1]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 2, 'packages_deposited' => 2]]);
     $this->transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
@@ -371,9 +371,9 @@ it('waits for the real package total before showing progress', function () {
         ],
     ]);
 
-    $this->artisan('protect')
+    $this->artisan('deposit')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('Protected: 2')
+        ->expectsOutputToContain('Deposited: 2')
         ->assertExitCode(0);
 });
 
@@ -385,7 +385,7 @@ it('refreshes the lock content hash to match the wired composer.json', function 
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 
-    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_protected' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1]], 202);
     $this->transport->queueJson([
         'composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": []}',
         'repositories' => [
@@ -394,7 +394,7 @@ it('refreshes the lock content hash to match the wired composer.json', function 
         ],
     ]);
 
-    $this->artisan('protect', ['--write' => true])
+    $this->artisan('deposit', ['--write' => true])
         ->expectsOutputToContain('already configured in composer.json')
         ->assertExitCode(0);
 

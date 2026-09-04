@@ -73,7 +73,7 @@ it('lists projects with latest runs', function () {
         'repository_url' => null,
         'repository' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
         'repository_published' => true,
-        'protection_percentage' => 98.5,
+        'deposit_percentage' => 98.5,
         'latest_run' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 240],
     ]]]);
 
@@ -81,25 +81,25 @@ it('lists projects with latest runs', function () {
 
     expect($projects)->toHaveCount(1)
         ->and($projects[0]->name)->toBe('Vaults App')
-        ->and($projects[0]->protectionPercentage)->toBe(98.5)
+        ->and($projects[0]->depositPercentage)->toBe(98.5)
         ->and($projects[0]->latestRun?->status)->toBe('completed');
 });
 
-it('starts a protection run and reads it back with items', function () {
+it('starts a deposit run and reads it back with items', function () {
     $transport = new FakeTransport;
     $transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 2]], 202);
     $transport->queueJson(['data' => [
         'uuid' => 'run-uuid',
         'status' => 'completed',
         'packages_total' => 2,
-        'packages_protected' => 2,
+        'packages_deposited' => 2,
         'items' => [
-            ['uuid' => 'i1', 'status' => 'protected', 'error' => null, 'package' => 'a/b', 'version' => 'v1.0.0', 'reference' => 'ref', 'security_status' => 'clear'],
+            ['uuid' => 'i1', 'status' => 'deposited', 'error' => null, 'package' => 'a/b', 'version' => 'v1.0.0', 'reference' => 'ref', 'security_status' => 'clear'],
         ],
     ]]);
 
     $client = fakeClient($transport);
-    $run = $client->protect('project-uuid', '{"packages":[]}');
+    $run = $client->deposit('project-uuid', '{"packages":[]}');
 
     expect($run->uuid)->toBe('run-uuid')
         ->and($run->isFinished())->toBeFalse();
@@ -111,22 +111,22 @@ it('starts a protection run and reads it back with items', function () {
         ->and($finished->items[0]->securityStatus)->toBe('clear');
 });
 
-it('runs a protection check', function () {
+it('runs a deposit check', function () {
     $transport = new FakeTransport;
     $transport->queueJson(['data' => [
         'total' => 2,
-        'protected' => 1,
-        'unprotected' => 1,
+        'deposited' => 1,
+        'undeposited' => 1,
         'packages' => [
-            ['name' => 'a/b', 'version' => 'v1.0.0', 'protected' => true, 'security_status' => 'clear'],
-            ['name' => 'c/d', 'version' => 'v2.0.0', 'protected' => false, 'security_status' => null],
+            ['name' => 'a/b', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear'],
+            ['name' => 'c/d', 'version' => 'v2.0.0', 'deposited' => false, 'security_status' => null],
         ],
     ]]);
 
-    $check = fakeClient($transport)->protectCheck('project-uuid', '{}');
+    $check = fakeClient($transport)->depositCheck('project-uuid', '{}');
 
-    expect($check->isFullyProtected())->toBeFalse()
-        ->and($check->packages[0]->protected)->toBeTrue()
+    expect($check->isFullyDeposited())->toBeFalse()
+        ->and($check->packages[0]->deposited)->toBeTrue()
         ->and($check->packages[1]->securityStatus)->toBeNull();
 });
 

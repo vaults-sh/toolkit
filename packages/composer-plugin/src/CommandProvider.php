@@ -15,7 +15,7 @@ final class CommandProvider implements CommandProviderCapability
     public function getCommands(): array
     {
         return [
-            new ProtectCommand,
+            new DepositCommand,
         ];
     }
 }

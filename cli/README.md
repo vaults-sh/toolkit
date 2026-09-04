@@ -16,10 +16,10 @@ mv vaults /usr/local/bin/vaults
 | Command | Purpose |
 |---|---|
 | `vaults login` | Device login: shows a code, opens the browser, waits for approval. `--token=` for CI. |
-| `vaults init` | Link this directory to a Vaults project (pick one or create by name) without protecting anything. |
-| `vaults protect` | Protects everything in `composer.lock`; offers to wire composer.json; `--write` applies the rewritten lock. |
-| `vaults protect --check` | Read-only protection report; exit code 1 if anything is unprotected (CI-friendly). |
-| `vaults status` | Protection status of the project in the current directory. |
+| `vaults init` | Link this directory to a Vaults project (pick one or create by name) without depositing anything. |
+| `vaults deposit` | Deposits everything in `composer.lock`; offers to wire composer.json; `--write` applies the rewritten lock. |
+| `vaults deposit --check` | Read-only deposit report; exit code 1 if anything is undeposited (CI-friendly). |
+| `vaults status` | Deposit status of the project in the current directory. |
 | `vaults doctor` | Connectivity diagnosis: API, auth, DNS, and edge health. |
 | `vaults logout` | Remove stored credentials. |
 
@@ -50,4 +50,4 @@ Caveat: with Packagist disabled, `composer update` and `composer require` cannot
 
 - **`composer install`** always installs from Vaults: the rewritten `composer.lock` points every dist at `dist.vaults-edge.net`, with each package's `source` (GitHub) kept as an automatic fallback if a Vaults download ever fails.
 - **`composer update` / `require`** resolve versions against Packagist and prefer Vaults for any version Vaults already holds (the Vaults repository is `canonical: false`, so it's consulted first but never hides newer upstream releases).
-- Vaults backfills tracked packages toward full coverage automatically, and this plugin protects whatever you update to in the background, so you converge on Vaults with no manual step. Run `composer protect --write` after an update to pin the lock immediately.
+- Vaults backfills tracked packages toward full coverage automatically, and this plugin deposits whatever you update to in the background, so you converge on Vaults with no manual step. Run `composer deposit --write` after an update to pin the lock immediately.

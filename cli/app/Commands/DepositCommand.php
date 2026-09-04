@@ -12,7 +12,7 @@ use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
 use Vaults\Result\CheckPackage;
-use Vaults\Result\ProtectionRun;
+use Vaults\Result\DepositRun;
 use Vaults\Result\RewrittenLock;
 use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
@@ -21,16 +21,16 @@ use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\progress;
 use function Laravel\Prompts\spin;
 
-class ProtectCommand extends Command
+class DepositCommand extends Command
 {
     use ResolvesProject;
 
-    protected $signature = 'protect
-        {--check : Report protection status without starting a run}
+    protected $signature = 'deposit
+        {--check : Report deposit status without starting a run}
         {--write : Overwrite composer.lock with the rewritten Vaults version}
         {--project= : Project UUID (overrides .vaults.json)}';
 
-    protected $description = 'Protect the dependencies in composer.lock with Vaults';
+    protected $description = 'Deposit the dependencies in composer.lock with Vaults';
 
     public function handle(VaultsClient $client, ProjectManifest $manifest): int
     {
@@ -56,7 +56,7 @@ class ProtectCommand extends Command
                 return $this->check($client, $projectUuid, $lock);
             }
 
-            return $this->protect($client, $projectUuid, $lock, $lockPath, $directory);
+            return $this->deposit($client, $projectUuid, $lock, $lockPath, $directory);
         } catch (AuthenticationException) {
             $this->error('Not authenticated. Run vaults login first.');
 
@@ -70,41 +70,41 @@ class ProtectCommand extends Command
 
     private function check(VaultsClient $client, string $projectUuid, string $lock): int
     {
-        $result = spin(fn () => $client->protectCheck($projectUuid, $lock), 'Checking protection status...');
+        $result = spin(fn () => $client->depositCheck($projectUuid, $lock), 'Checking deposit status...');
 
         $this->table(
-            ['Package', 'Version', 'Protected', 'Security'],
+            ['Package', 'Version', 'Deposited', 'Security'],
             array_map(fn (CheckPackage $package): array => [
                 $package->name,
                 $package->version,
-                $package->protected ? '<fg=green>✓</>' : '<fg=red>✗</>',
+                $package->deposited ? '<fg=green>✓</>' : '<fg=red>✗</>',
                 $this->securityLabel($package->securityStatus),
             ], $result->packages),
         );
 
-        $this->line($result->protected.'/'.$result->total.' protected, '.$result->unprotected.' unprotected.');
+        $this->line($result->deposited.'/'.$result->total.' deposited, '.$result->undeposited.' undeposited.');
 
-        if (! $result->isFullyProtected()) {
-            $this->warn('Run vaults protect to protect the remaining packages.');
+        if (! $result->isFullyDeposited()) {
+            $this->warn('Run vaults deposit to deposit the remaining packages.');
 
             return self::FAILURE;
         }
 
-        $this->info('All packages are protected.');
+        $this->info('All packages are deposited.');
 
         return self::SUCCESS;
     }
 
-    private function protect(VaultsClient $client, string $projectUuid, string $lock, string $lockPath, string $directory): int
+    private function deposit(VaultsClient $client, string $projectUuid, string $lock, string $lockPath, string $directory): int
     {
-        $run = spin(fn () => $client->protect($projectUuid, $lock), 'Starting the protection run...');
+        $run = spin(fn () => $client->deposit($projectUuid, $lock), 'Starting the deposit run...');
 
         $run = $this->awaitRun($client, $this->laravel->make(Sleeper::class), $run);
 
-        $this->line('Protected: '.$run->packagesProtected.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed);
+        $this->line('Deposited: '.$run->packagesDeposited.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed);
 
         if ($run->status !== 'completed') {
-            $this->error('The protection run failed. See the dashboard for details.');
+            $this->error('The deposit run failed. See the dashboard for details.');
 
             return self::FAILURE;
         }
@@ -117,15 +117,15 @@ class ProtectCommand extends Command
             file_put_contents($lockPath, resolve(LockContentHash::class)->refresh($rewritten->composerLock, $directory.DIRECTORY_SEPARATOR.'composer.json'));
             $this->info('composer.lock rewritten to install from Vaults. Run composer install.');
         } else {
-            $this->line('Run vaults protect --write to rewrite composer.lock, then composer install.');
+            $this->line('Run vaults deposit --write to rewrite composer.lock, then composer install.');
         }
 
         return self::SUCCESS;
     }
 
-    private function awaitRun(VaultsClient $client, Sleeper $sleeper, ProtectionRun $run): ProtectionRun
+    private function awaitRun(VaultsClient $client, Sleeper $sleeper, DepositRun $run): DepositRun
     {
-        $run = spin(function () use ($client, $sleeper, $run): ProtectionRun {
+        $run = spin(function () use ($client, $sleeper, $run): DepositRun {
             while (! $run->isFinished() && $run->packagesTotal === 0) {
                 $sleeper->sleep(1);
 
@@ -140,7 +140,7 @@ class ProtectCommand extends Command
         }
 
         $total = $run->packagesTotal;
-        $progress = progress(label: 'Protecting '.$total.' packages...', steps: $total);
+        $progress = progress(label: 'Depositing '.$total.' packages...', steps: $total);
         $progress->start();
         $reported = 0;
 
@@ -149,10 +149,10 @@ class ProtectCommand extends Command
 
             $run = $client->getRun($run->uuid);
 
-            $done = min($total, $run->packagesProtected + $run->packagesSkipped + $run->packagesFailed);
+            $done = min($total, $run->packagesDeposited + $run->packagesSkipped + $run->packagesFailed);
 
             if ($done > $reported) {
-                $progress->hint($run->packagesProtected.' protected · '.$run->packagesSkipped.' skipped · '.$run->packagesFailed.' failed');
+                $progress->hint($run->packagesDeposited.' deposited · '.$run->packagesSkipped.' skipped · '.$run->packagesFailed.' failed');
                 $progress->advance($done - $reported);
                 $reported = $done;
             }

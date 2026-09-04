@@ -17,7 +17,7 @@ class StatusCommand extends Command
 
     protected $signature = 'status {--project= : Project UUID (overrides .vaults.json)}';
 
-    protected $description = 'Show the protection status of this project';
+    protected $description = 'Show the deposit status of this project';
 
     public function handle(VaultsClient $client, ProjectManifest $manifest): int
     {
@@ -56,10 +56,10 @@ class StatusCommand extends Command
 
             $this->info($project->name);
             $this->table(['Metric', 'Value'], [
-                ['Protection', $project->protectionPercentage.'%'],
+                ['Deposit', $project->depositPercentage.'%'],
                 ['Repository published', $project->repositoryPublished ? 'yes' : 'no'],
                 ['Latest run', $project->latestRun?->status ?? 'never'],
-                ['Latest run packages', $project->latestRun !== null ? $project->latestRun->packagesProtected.'/'.$project->latestRun->packagesTotal : '-'],
+                ['Latest run packages', $project->latestRun !== null ? $project->latestRun->packagesDeposited.'/'.$project->latestRun->packagesTotal : '-'],
             ]);
 
             return self::SUCCESS;

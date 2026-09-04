@@ -11,27 +11,27 @@ This repository holds the three client-side pieces, developed together and relea
 | Package | What it does |
 | --- | --- |
 | [`vaults/php-client`](packages/php-client) | Zero-dependency PHP client for the Vaults API. |
-| [`vaults/composer-plugin`](packages/composer-plugin) | Adds `composer protect` to any project. |
-| `vaults` CLI ([`cli/`](cli)) | Standalone PHAR with `vaults login`, `vaults protect`, `vaults doctor`, and `vaults status`. |
+| [`vaults/composer-plugin`](packages/composer-plugin) | Adds `composer deposit` to any project. |
+| `vaults` CLI ([`cli/`](cli)) | Standalone PHAR with `vaults login`, `vaults deposit`, `vaults doctor`, and `vaults status`. |
 
 ## Install
 
-Protect a project from inside Composer with the plugin:
+Deposit a project from inside Composer with the plugin:
 
 ```bash
 composer require --dev vaults/composer-plugin
-composer protect
+composer deposit
 ```
 
 Or use the CLI. Download the latest `vaults` PHAR from the [Releases](https://github.com/vaults-sh/toolkit/releases) page:
 
 ```bash
 chmod +x vaults && mv vaults /usr/local/bin/vaults
-vaults protect
+vaults deposit
 ```
 
 Both authenticate with a browser device login and walk you through picking or creating a project, so
-there are no UUIDs to copy and no dashboard to open. Once a project is protected, `composer install`
+there are no UUIDs to copy and no dashboard to open. Once a project is deposited, `composer install`
 runs entirely from the Vaults edge, and neither tool is needed at install time.
 
 ## Development

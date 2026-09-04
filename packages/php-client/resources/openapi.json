@@ -15,11 +15,11 @@
         }
     ],
     "paths": {
-        "/v1/projects/{project}/protect/check": {
+        "/v1/projects/{project}/deposit/check": {
             "post": {
-                "operationId": "v1.projects.protect-check",
+                "operationId": "v1.projects.deposit-check",
                 "tags": [
-                    "CheckProjectProtection"
+                    "CheckProjectDeposit"
                 ],
                 "parameters": [
                     {
@@ -33,26 +33,26 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "`ProtectProjectData`",
+                    "description": "`DepositProjectData`",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ProtectProjectData"
+                                "$ref": "#/components/schemas/DepositProjectData"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "`ProtectionCheckResource`",
+                        "description": "`DepositCheckResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/ProtectionCheckResource"
+                                            "$ref": "#/components/schemas/DepositCheckResource"
                                         }
                                     },
                                     "required": [
@@ -532,18 +532,18 @@
                 }
             }
         },
-        "/v1/protection-runs/{protectionRun}": {
+        "/v1/deposit-runs/{depositRun}": {
             "get": {
-                "operationId": "v1.protection-runs.show",
+                "operationId": "v1.deposit-runs.show",
                 "tags": [
-                    "GetProtectionRun"
+                    "GetDepositRun"
                 ],
                 "parameters": [
                     {
-                        "name": "protectionRun",
+                        "name": "depositRun",
                         "in": "path",
                         "required": true,
-                        "description": "The protection run UUID",
+                        "description": "The deposit run UUID",
                         "schema": {
                             "type": "string"
                         }
@@ -551,7 +551,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "`ProtectionRunResource`",
+                        "description": "`DepositRunResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -560,7 +560,7 @@
                                         "data": {
                                             "allOf": [
                                                 {
-                                                    "$ref": "#/components/schemas/ProtectionRunResource"
+                                                    "$ref": "#/components/schemas/DepositRunResource"
                                                 },
                                                 {
                                                     "type": "object",
@@ -587,18 +587,18 @@
                 }
             }
         },
-        "/v1/protection-runs/{protectionRun}/lock": {
+        "/v1/deposit-runs/{depositRun}/lock": {
             "get": {
-                "operationId": "v1.protection-runs.lock",
+                "operationId": "v1.deposit-runs.lock",
                 "tags": [
                     "GetRewrittenLock"
                 ],
                 "parameters": [
                     {
-                        "name": "protectionRun",
+                        "name": "depositRun",
                         "in": "path",
                         "required": true,
-                        "description": "The protection run UUID",
+                        "description": "The deposit run UUID",
                         "schema": {
                             "type": "string"
                         }
@@ -800,11 +800,11 @@
                 }
             }
         },
-        "/v1/projects/{project}/protect": {
+        "/v1/projects/{project}/deposit": {
             "post": {
-                "operationId": "v1.projects.protect",
+                "operationId": "v1.projects.deposit",
                 "tags": [
-                    "ProtectProject"
+                    "DepositProject"
                 ],
                 "parameters": [
                     {
@@ -818,26 +818,26 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "`ProtectProjectData`",
+                    "description": "`DepositProjectData`",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ProtectProjectData"
+                                "$ref": "#/components/schemas/DepositProjectData"
                             }
                         }
                     }
                 },
                 "responses": {
                     "202": {
-                        "description": "`ProtectionRunResource`",
+                        "description": "`DepositRunResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/ProtectionRunResource"
+                                            "$ref": "#/components/schemas/DepositRunResource"
                                         }
                                     },
                                     "required": [
@@ -1094,7 +1094,7 @@
                     "security_status": {
                         "type": "string"
                     },
-                    "protected": {
+                    "deposited": {
                         "type": "boolean"
                     },
                     "artifact": {
@@ -1117,7 +1117,7 @@
                     "reference",
                     "sha256",
                     "security_status",
-                    "protected"
+                    "deposited"
                 ],
                 "title": "PackageVersionResource"
             },
@@ -1174,13 +1174,13 @@
                     "repository_published": {
                         "type": "boolean"
                     },
-                    "protection_percentage": {
+                    "deposit_percentage": {
                         "type": "integer"
                     },
                     "latest_run": {
                         "anyOf": [
                             {
-                                "$ref": "#/components/schemas/ProtectionRunResource"
+                                "$ref": "#/components/schemas/DepositRunResource"
                             },
                             {
                                 "type": "null"
@@ -1201,12 +1201,12 @@
                     "repository_url",
                     "repository",
                     "repository_published",
-                    "protection_percentage",
+                    "deposit_percentage",
                     "created_at"
                 ],
                 "title": "ProjectResource"
             },
-            "ProtectProjectData": {
+            "DepositProjectData": {
                 "type": "object",
                 "properties": {
                     "composer_lock": {
@@ -1217,18 +1217,18 @@
                 "required": [
                     "composer_lock"
                 ],
-                "title": "ProtectProjectData"
+                "title": "DepositProjectData"
             },
-            "ProtectionCheckResource": {
+            "DepositCheckResource": {
                 "type": "object",
                 "properties": {
                     "total": {
                         "type": "integer"
                     },
-                    "protected": {
+                    "deposited": {
                         "type": "integer"
                     },
-                    "unprotected": {
+                    "undeposited": {
                         "type": "integer"
                     },
                     "packages": {
@@ -1238,13 +1238,13 @@
                 },
                 "required": [
                     "total",
-                    "protected",
-                    "unprotected",
+                    "deposited",
+                    "undeposited",
                     "packages"
                 ],
-                "title": "ProtectionCheckResource"
+                "title": "DepositCheckResource"
             },
-            "ProtectionRunItemResource": {
+            "DepositRunItemResource": {
                 "type": "object",
                 "properties": {
                     "uuid": {
@@ -1281,9 +1281,9 @@
                     "reference",
                     "security_status"
                 ],
-                "title": "ProtectionRunItemResource"
+                "title": "DepositRunItemResource"
             },
-            "ProtectionRunResource": {
+            "DepositRunResource": {
                 "type": "object",
                 "properties": {
                     "uuid": {
@@ -1295,7 +1295,7 @@
                     "packages_total": {
                         "type": "integer"
                     },
-                    "packages_protected": {
+                    "packages_deposited": {
                         "type": "integer"
                     },
                     "packages_failed": {
@@ -1325,7 +1325,7 @@
                     "items": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/ProtectionRunItemResource"
+                            "$ref": "#/components/schemas/DepositRunItemResource"
                         }
                     }
                 },
@@ -1333,14 +1333,14 @@
                     "uuid",
                     "status",
                     "packages_total",
-                    "packages_protected",
+                    "packages_deposited",
                     "packages_failed",
                     "packages_skipped",
                     "started_at",
                     "finished_at",
                     "created_at"
                 ],
-                "title": "ProtectionRunResource"
+                "title": "DepositRunResource"
             },
             "TokenResource": {
                 "type": "object",

@@ -11,8 +11,8 @@ final readonly class CheckResult
      */
     public function __construct(
         public int $total,
-        public int $protected,
-        public int $unprotected,
+        public int $deposited,
+        public int $undeposited,
         public array $packages,
     ) {}
 
@@ -32,14 +32,14 @@ final readonly class CheckResult
 
         return new self(
             (int) ($data['total'] ?? 0),
-            (int) ($data['protected'] ?? 0),
-            (int) ($data['unprotected'] ?? 0),
+            (int) ($data['deposited'] ?? 0),
+            (int) ($data['undeposited'] ?? 0),
             $packages,
         );
     }
 
-    public function isFullyProtected(): bool
+    public function isFullyDeposited(): bool
     {
-        return $this->unprotected === 0;
+        return $this->undeposited === 0;
     }
 }
