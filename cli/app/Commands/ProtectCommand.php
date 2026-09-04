@@ -14,6 +14,7 @@ use Vaults\Project\ProjectManifest;
 use Vaults\Result\CheckPackage;
 use Vaults\Result\ProtectionRun;
 use Vaults\Result\RewrittenLock;
+use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
 
 use function Laravel\Prompts\confirm;
@@ -98,7 +99,7 @@ class ProtectCommand extends Command
     {
         $run = spin(fn () => $client->protect($projectUuid, $lock), 'Starting the protection run...');
 
-        $run = $this->awaitRun($client, $run);
+        $run = $this->awaitRun($client, $this->laravel->make(Sleeper::class), $run);
 
         $this->line('Protected: '.$run->packagesProtected.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed);
 
@@ -122,11 +123,11 @@ class ProtectCommand extends Command
         return self::SUCCESS;
     }
 
-    private function awaitRun(VaultsClient $client, ProtectionRun $run): ProtectionRun
+    private function awaitRun(VaultsClient $client, Sleeper $sleeper, ProtectionRun $run): ProtectionRun
     {
-        $run = spin(function () use ($client, $run): ProtectionRun {
+        $run = spin(function () use ($client, $sleeper, $run): ProtectionRun {
             while (! $run->isFinished() && $run->packagesTotal === 0) {
-                sleep(1);
+                $sleeper->sleep(1);
 
                 $run = $client->getRun($run->uuid);
             }
@@ -144,7 +145,7 @@ class ProtectCommand extends Command
         $reported = 0;
 
         while (! $run->isFinished()) {
-            sleep(2);
+            $sleeper->sleep(2);
 
             $run = $client->getRun($run->uuid);
 

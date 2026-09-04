@@ -75,11 +75,11 @@ final class VaultsClient
         $response = $this->send('POST', '/api/v1/device-codes/poll', ['device_code' => $deviceCode], $this->authBaseUrl);
 
         if ($response->status === 410) {
-            return new PollResult('expired');
+            return PollResult::expired();
         }
 
         if ($response->status === 404) {
-            return new PollResult('denied');
+            return PollResult::denied();
         }
 
         return PollResult::fromArray($this->decode($response));

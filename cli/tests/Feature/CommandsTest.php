@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Services\ComposerConfigWriter;
 use App\Services\EdgeProbe;
 use App\Services\LockContentHash;
+use Illuminate\Support\Sleep;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
 use Vaults\VaultsClient;
 
 beforeEach(function () {
+    Sleep::fake();
     $this->transport = new FakeTransport;
     $this->workDir = sys_get_temp_dir().'/vaults-cli-tests/'.uniqid();
     mkdir($this->workDir, 0755, true);
@@ -199,13 +201,15 @@ it('reports a device login that was denied in the browser', function () {
         'verification_uri' => 'https://vaults.test/device',
         'verification_uri_complete' => 'https://vaults.test/device?code=ABCD-EFGH',
         'expires_in' => 900,
-        'interval' => 0,
+        'interval' => 5,
     ]], 201);
     $this->transport->queueJson(['message' => 'Not Found.'], 404);
 
     $this->artisan('login', ['--no-interaction' => true])
         ->expectsOutputToContain('denied in the browser')
         ->assertExitCode(1);
+
+    Sleep::assertSleptTimes(1);
 
     expect($this->tokenStore->token())->toBeNull();
 });

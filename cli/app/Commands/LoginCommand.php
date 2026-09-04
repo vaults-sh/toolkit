@@ -16,15 +16,13 @@ class LoginCommand extends Command
 
     protected $description = 'Authenticate the CLI with your Vaults team';
 
-    public function handle(VaultsClient $client, TokenStore $store): int
+    public function handle(VaultsClient $client, TokenStore $store, DeviceFlow $flow): int
     {
         $pasted = $this->option('token');
 
         if (is_string($pasted) && $pasted !== '') {
             return $this->storeValidated($client, $store, $pasted);
         }
-
-        $flow = new DeviceFlow($client);
 
         try {
             $pair = $flow->start((string) (gethostname() ?: 'vaults-cli'));

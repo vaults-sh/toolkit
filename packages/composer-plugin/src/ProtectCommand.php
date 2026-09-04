@@ -19,18 +19,19 @@ use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
 use Vaults\Project\ProjectName;
 use Vaults\Result\Project;
+use Vaults\Support\NativeSleeper;
+use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
 
 final class ProtectCommand extends BaseCommand
 {
     /**
-     * @param  (callable(int): void)|null  $sleep
      */
     public function __construct(
         private ?VaultsClient $client = null,
         private ?TokenStore $store = null,
         private ?string $workingDirectory = null,
-        private $sleep = null,
+        private ?Sleeper $sleeper = null,
         private ?IOInterface $io = null,
     ) {
         parent::__construct();
@@ -177,7 +178,7 @@ final class ProtectCommand extends BaseCommand
     private function deviceLogin(TokenStore $store, OutputInterface $output): ?string
     {
         $client = $this->client ?? new VaultsClient;
-        $flow = new DeviceFlow($client);
+        $flow = new DeviceFlow($client, $this->sleeper ?? new NativeSleeper);
 
         try {
             $pair = $flow->start((string) (gethostname() ?: 'composer-plugin'));
@@ -191,7 +192,7 @@ final class ProtectCommand extends BaseCommand
         $output->writeln('Then approve it at: <info>'.$pair->verificationUriComplete.'</info>');
         $output->writeln('Waiting for approval...');
 
-        $result = $flow->await($pair, sleep: $this->sleep);
+        $result = $flow->await($pair);
 
         if ($result->isDenied()) {
             $output->writeln('<error>This sign-in was denied in the browser. Nothing was saved.</error>');
@@ -245,7 +246,7 @@ final class ProtectCommand extends BaseCommand
         $output->writeln('Protection run started.');
 
         while (! $run->isFinished()) {
-            ($this->sleep ?? static fn (int $seconds) => sleep($seconds))(2);
+            ($this->sleeper ?? new NativeSleeper)->sleep(2);
 
             $run = $client->getRun($run->uuid);
 

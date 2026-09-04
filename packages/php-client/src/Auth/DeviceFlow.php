@@ -6,11 +6,19 @@ namespace Vaults\Auth;
 
 use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
+use Vaults\Support\Clock;
+use Vaults\Support\NativeSleeper;
+use Vaults\Support\Sleeper;
+use Vaults\Support\SystemClock;
 use Vaults\VaultsClient;
 
 final readonly class DeviceFlow
 {
-    public function __construct(private VaultsClient $client) {}
+    public function __construct(
+        private VaultsClient $client,
+        private Sleeper $sleeper = new NativeSleeper,
+        private Clock $clock = new SystemClock,
+    ) {}
 
     public function start(?string $name = null): DeviceCodePair
     {
@@ -19,18 +27,13 @@ final readonly class DeviceFlow
 
     /**
      * @param  (callable(int): void)|null  $onPoll
-     * @param  (callable(int): void)|null  $sleep
      */
-    public function await(DeviceCodePair $pair, ?callable $onPoll = null, ?callable $sleep = null): PollResult
+    public function await(DeviceCodePair $pair, ?callable $onPoll = null): PollResult
     {
-        $sleep ??= static fn (int $seconds) => sleep($seconds);
-        $deadline = time() + $pair->expiresIn;
-        $attempt = 0;
+        $deadline = $this->clock->now() + $pair->expiresIn;
 
-        while (time() < $deadline) {
-            $sleep($pair->interval);
-
-            $attempt++;
+        for ($attempt = 1; $this->clock->now() < $deadline; $attempt++) {
+            $this->sleeper->sleep($pair->interval);
 
             if ($onPoll !== null) {
                 $onPoll($attempt);
@@ -38,11 +41,11 @@ final readonly class DeviceFlow
 
             $result = $this->client->pollDeviceCode($pair->deviceCode);
 
-            if (! $result->isPending()) {
+            if ($result->isTerminal()) {
                 return $result;
             }
         }
 
-        return new PollResult('expired');
+        return PollResult::expired();
     }
 }

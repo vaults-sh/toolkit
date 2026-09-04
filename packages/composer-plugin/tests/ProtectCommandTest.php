@@ -10,6 +10,7 @@ use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
 use Vaults\ComposerPlugin\ProtectCommand;
 use Vaults\ComposerPlugin\VaultsPlugin;
+use Vaults\Support\FakeSleeper;
 use Vaults\VaultsClient;
 
 beforeEach(function () {
@@ -25,7 +26,7 @@ beforeEach(function () {
         new VaultsClient(null, 'https://vaults.test', $this->transport, 'https://auth.vaults.test'),
         $this->store,
         $this->workDir,
-        fn (int $seconds) => null,
+        new FakeSleeper,
         $this->io,
     );
     $command->setApplication(new Application);

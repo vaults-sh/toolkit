@@ -26,6 +26,21 @@ final readonly class PollResult
         );
     }
 
+    public static function expired(): self
+    {
+        return new self('expired');
+    }
+
+    public static function denied(): self
+    {
+        return new self('denied');
+    }
+
+    public function isTerminal(): bool
+    {
+        return ! $this->isPending();
+    }
+
     public function isApproved(): bool
     {
         return $this->status === 'approved';
