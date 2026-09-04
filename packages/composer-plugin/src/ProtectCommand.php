@@ -13,9 +13,12 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Vaults\Auth\DeviceFlow;
 use Vaults\Auth\TokenStore;
+use Vaults\Exception\ApiException;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
+use Vaults\Project\ProjectName;
+use Vaults\Result\Project;
 use Vaults\VaultsClient;
 
 final class ProtectCommand extends BaseCommand
@@ -135,8 +138,7 @@ final class ProtectCommand extends BaseCommand
         }
 
         if ($project === null) {
-            $name = (string) $io->ask('What should the new project be called? ['.$this->defaultProjectName($directory).'] ', $this->defaultProjectName($directory));
-            $project = $client->createProject($name !== '' ? $name : $this->defaultProjectName($directory));
+            $project = $this->createProject($client, $io, $output, $directory);
         }
 
         $manifest->write($directory, $project->uuid);
@@ -145,20 +147,31 @@ final class ProtectCommand extends BaseCommand
         return $project->uuid;
     }
 
-    private function defaultProjectName(string $directory): string
+    private function createProject(VaultsClient $client, IOInterface $io, OutputInterface $output, string $directory): Project
     {
-        $composerJson = $directory.DIRECTORY_SEPARATOR.'composer.json';
+        $suggested = ProjectName::suggest($directory);
 
-        if (is_file($composerJson)) {
-            $decoded = json_decode((string) file_get_contents($composerJson), true);
-            $name = is_array($decoded) && is_string($decoded['name'] ?? null) ? $decoded['name'] : '';
+        while (true) {
+            $answer = (string) $io->ask('What should the new project be called? ['.$suggested.'] ', $suggested);
+            $name = ProjectName::normalise($answer !== '' ? $answer : $suggested);
 
-            if (str_contains($name, '/')) {
-                return explode('/', $name, 2)[1];
+            if (! ProjectName::isValid($name)) {
+                $output->writeln('<error>'.ProjectName::RULE.'</error>');
+
+                continue;
+            }
+
+            try {
+                return $client->createProject($name);
+            } catch (ApiException $exception) {
+                if (! $exception->isValidationError()) {
+                    throw $exception;
+                }
+
+                $output->writeln('<error>'.($exception->firstError('name') ?? $exception->getMessage()).'</error>');
+                $suggested = $name;
             }
         }
-
-        return basename($directory);
     }
 
     private function deviceLogin(TokenStore $store, OutputInterface $output): ?string
@@ -179,6 +192,12 @@ final class ProtectCommand extends BaseCommand
         $output->writeln('Waiting for approval...');
 
         $result = $flow->await($pair, sleep: $this->sleep);
+
+        if ($result->isDenied()) {
+            $output->writeln('<error>This sign-in was denied in the browser. Nothing was saved.</error>');
+
+            return null;
+        }
 
         if (! $result->isApproved() || $result->token === null) {
             $output->writeln('<error>The device code expired before it was approved.</error>');

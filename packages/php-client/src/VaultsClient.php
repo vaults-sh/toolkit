@@ -78,6 +78,10 @@ final class VaultsClient
             return new PollResult('expired');
         }
 
+        if ($response->status === 404) {
+            return new PollResult('denied');
+        }
+
         return PollResult::fromArray($this->decode($response));
     }
 

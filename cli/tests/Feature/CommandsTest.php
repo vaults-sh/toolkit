@@ -159,6 +159,57 @@ it('links interactively by creating a project when none exist', function () {
     expect(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'new-uuid']);
 });
 
+it('normalises a typed project name before creating it', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+
+    $this->transport->queueJson(['data' => []]);
+    $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api']], 201);
+    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+
+    $this->artisan('protect', ['--check' => true])
+        ->expectsQuestion('What should the new project be called?', 'Checkout API')
+        ->expectsOutputToContain('Linked this directory to "checkout-api"')
+        ->assertExitCode(0);
+
+    expect(json_decode((string) $this->transport->requests[1]->body, true))->toMatchArray(['name' => 'checkout-api']);
+});
+
+it('asks again when the dashboard rejects the project name', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+
+    $this->transport->queueJson(['data' => []]);
+    $this->transport->queueJson(['message' => 'A project with this name already exists in this team.', 'errors' => ['name' => ['A project with this name already exists in this team.']]], 422);
+    $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api-2']], 201);
+    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+
+    $this->artisan('protect', ['--check' => true])
+        ->expectsQuestion('What should the new project be called?', 'checkout-api')
+        ->expectsOutputToContain('already exists in this team')
+        ->expectsQuestion('What should the new project be called?', 'checkout-api-2')
+        ->expectsOutputToContain('Linked this directory to "checkout-api-2"')
+        ->assertExitCode(0);
+});
+
+it('reports a device login that was denied in the browser', function () {
+    $this->app->instance(VaultsClient::class, new VaultsClient(null, 'https://vaults.test', $this->transport));
+
+    $this->transport->queueJson(['data' => [
+        'device_code' => 'plain-code',
+        'user_code' => 'ABCD-EFGH',
+        'verification_uri' => 'https://vaults.test/device',
+        'verification_uri_complete' => 'https://vaults.test/device?code=ABCD-EFGH',
+        'expires_in' => 900,
+        'interval' => 0,
+    ]], 201);
+    $this->transport->queueJson(['message' => 'Not Found.'], 404);
+
+    $this->artisan('login', ['--no-interaction' => true])
+        ->expectsOutputToContain('denied in the browser')
+        ->assertExitCode(1);
+
+    expect($this->tokenStore->token())->toBeNull();
+});
+
 it('links interactively by selecting an existing project', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 

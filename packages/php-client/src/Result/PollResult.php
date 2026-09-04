@@ -40,4 +40,9 @@ final readonly class PollResult
     {
         return $this->status === 'expired';
     }
+
+    public function isDenied(): bool
+    {
+        return $this->status === 'denied';
+    }
 }

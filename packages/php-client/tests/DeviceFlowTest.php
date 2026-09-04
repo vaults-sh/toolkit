@@ -39,6 +39,19 @@ it('stops when the server reports expiry', function () {
     expect($flow->await(pair(), sleep: fn () => null)->isExpired())->toBeTrue();
 });
 
+it('stops when the sign-in is denied in the browser', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['message' => 'Not Found.'], 404);
+
+    $flow = new DeviceFlow(new VaultsClient(null, 'https://vaults.test', $transport));
+
+    $result = $flow->await(pair(), sleep: fn () => null);
+
+    expect($result->isDenied())->toBeTrue()
+        ->and($result->isApproved())->toBeFalse()
+        ->and($result->token)->toBeNull();
+});
+
 it('gives up locally once the pair lifetime has passed', function () {
     $transport = new FakeTransport;
 

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
+use Vaults\Exception\ApiException;
 use Vaults\Project\ProjectManifest;
+use Vaults\Project\ProjectName;
 use Vaults\Result\Project;
 use Vaults\VaultsClient;
 
@@ -89,28 +91,27 @@ trait ResolvesProject
 
     private function createProject(VaultsClient $client, string $directory): Project
     {
-        $name = text(
-            label: 'What should the new project be called?',
-            default: $this->defaultProjectName($directory),
-            required: true,
-        );
+        $suggested = ProjectName::suggest($directory);
 
-        return spin(fn (): Project => $client->createProject($name), 'Creating project...');
-    }
+        while (true) {
+            $name = ProjectName::normalise(text(
+                label: 'What should the new project be called?',
+                default: $suggested,
+                required: true,
+                hint: 'Lowercase letters, digits and hyphens, like checkout-api.',
+                validate: fn (string $value): ?string => ProjectName::isValid(ProjectName::normalise($value)) ? null : ProjectName::RULE,
+            ));
 
-    private function defaultProjectName(string $directory): string
-    {
-        $composerJson = $directory.DIRECTORY_SEPARATOR.'composer.json';
+            try {
+                return spin(fn (): Project => $client->createProject($name), 'Creating project...');
+            } catch (ApiException $exception) {
+                if (! $exception->isValidationError()) {
+                    throw $exception;
+                }
 
-        if (is_file($composerJson)) {
-            $decoded = json_decode((string) file_get_contents($composerJson), true);
-            $name = is_array($decoded) && is_string($decoded['name'] ?? null) ? $decoded['name'] : '';
-
-            if (str_contains($name, '/')) {
-                return explode('/', $name, 2)[1];
+                $this->error($exception->firstError('name') ?? $exception->getMessage());
+                $suggested = $name;
             }
         }
-
-        return basename($directory);
     }
 }

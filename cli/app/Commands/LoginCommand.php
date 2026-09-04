@@ -37,9 +37,18 @@ class LoginCommand extends Command
         $this->info('First, copy your device code: '.$pair->userCode);
         $this->line('Then approve it at: '.$pair->verificationUri);
         $this->newLine();
-        $this->openBrowser($pair->verificationUriComplete);
+
+        if ($this->input->isInteractive()) {
+            $this->openBrowser($pair->verificationUriComplete);
+        }
 
         $result = \Laravel\Prompts\spin(fn () => $flow->await($pair), 'Waiting for approval in the browser...');
+
+        if ($result->isDenied()) {
+            $this->error('This sign-in was denied in the browser. Nothing was saved.');
+
+            return self::FAILURE;
+        }
 
         if (! $result->isApproved() || $result->token === null) {
             $this->error('The device code expired before it was approved. Run vaults login to try again.');

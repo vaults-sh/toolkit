@@ -171,6 +171,48 @@ it('links interactively by creating a project when none exist', function () {
         ->and($this->io->questions[0])->toContain('What should the new project be called?');
 });
 
+it('normalises a typed project name and retries when the dashboard rejects it', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+
+    $this->io->queue('Checkout API');
+    $this->io->queue('checkout-api-2');
+
+    $this->transport->queueJson(['data' => []]);
+    $this->transport->queueJson(['message' => 'A project with this name already exists in this team.', 'errors' => ['name' => ['A project with this name already exists in this team.']]], 422);
+    $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'checkout-api-2']], 201);
+    $this->transport->queueJson(['data' => ['total' => 0, 'protected' => 0, 'unprotected' => 0, 'packages' => []]]);
+
+    $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
+
+    expect($exit)->toBe(0)
+        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toMatchArray(['name' => 'checkout-api'])
+        ->and(json_decode((string) $this->transport->requests[2]->body, true))->toMatchArray(['name' => 'checkout-api-2'])
+        ->and($this->tester->getDisplay())->toContain('already exists in this team')
+        ->and($this->tester->getDisplay())->toContain('Linked this directory to "checkout-api-2"');
+});
+
+it('reports a device login that was denied in the browser', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    $this->store->clear();
+
+    $this->transport->queueJson(['data' => [
+        'device_code' => 'plain-code',
+        'user_code' => 'ABCD-EFGH',
+        'verification_uri' => 'https://vaults.test/device',
+        'verification_uri_complete' => 'https://vaults.test/device?code=ABCD-EFGH',
+        'expires_in' => 900,
+        'interval' => 5,
+    ]], 201);
+    $this->transport->queueJson(['message' => 'Not Found.'], 404);
+
+    $exit = $this->tester->execute(['--check' => true], ['interactive' => true]);
+
+    expect($exit)->not->toBe(0)
+        ->and($this->tester->getDisplay())->toContain('denied in the browser')
+        ->and($this->store->token())->toBeNull();
+});
+
 it('links interactively by selecting an existing project', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
