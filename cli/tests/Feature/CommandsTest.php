@@ -403,3 +403,66 @@ it('refreshes the lock content hash to match the wired composer.json', function 
     expect((string) file_get_contents($this->workDir.'/composer.lock'))->toContain('"content-hash": "'.$expected.'"')
         ->not->toContain('dead');
 });
+
+it('links a project for private hosting and writes the bearer token to auth.json', function () {
+    file_put_contents($this->workDir.'/composer.json', json_encode([
+        'repositories' => [
+            ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+        ],
+    ], JSON_PRETTY_PRINT));
+
+    $this->transport->queueJson(['data' => [
+        'token' => 'vault-token-xyz',
+        'host' => 'private.vaults-edge.net',
+        'repository_url' => 'https://private.vaults-edge.net',
+        'expires_at' => time() + 604800,
+    ]]);
+
+    $this->artisan('private:link')
+        ->expectsOutputToContain('already configured in composer.json')
+        ->assertExitCode(0);
+
+    $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+
+    expect($auth['bearer']['private.vaults-edge.net'])->toBe('vault-token-xyz');
+});
+
+it('fails private:link when not authenticated', function () {
+    $this->transport->queueJson(['message' => 'Unauthenticated.'], 401);
+
+    $this->artisan('private:link')
+        ->expectsOutputToContain('Not authenticated')
+        ->assertExitCode(1);
+});
+
+it('writes the private token to the global composer auth.json with --global', function () {
+    $composerHome = $this->workDir.'/composer-home';
+    putenv('COMPOSER_HOME='.$composerHome);
+
+    file_put_contents($this->workDir.'/composer.json', json_encode([
+        'repositories' => [
+            ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+        ],
+    ], JSON_PRETTY_PRINT));
+
+    $this->transport->queueJson(['data' => [
+        'token' => 'global-token',
+        'host' => 'private.vaults-edge.net',
+        'repository_url' => 'https://private.vaults-edge.net',
+        'expires_at' => null,
+    ]]);
+
+    $this->artisan('private:link', ['--global' => true])->assertExitCode(0);
+
+    $auth = json_decode((string) file_get_contents($composerHome.'/auth.json'), true);
+
+    expect($auth['bearer']['private.vaults-edge.net'])->toBe('global-token');
+
+    putenv('COMPOSER_HOME');
+});
+
+it('opens the dashboard for the connect command', function () {
+    $this->artisan('connect')
+        ->expectsOutputToContain('Connections')
+        ->assertExitCode(0);
+});

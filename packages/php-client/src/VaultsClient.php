@@ -10,6 +10,7 @@ use Vaults\Result\CheckResult;
 use Vaults\Result\DepositRun;
 use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
+use Vaults\Result\PrivateToken;
 use Vaults\Result\Project;
 use Vaults\Result\RewrittenLock;
 use Vaults\Result\TeamIdentity;
@@ -108,6 +109,11 @@ final class VaultsClient
         ], fn (?string $value): bool => $value !== null);
 
         return Project::fromArray($this->request('POST', '/api/v1/projects', $payload));
+    }
+
+    public function createPrivateToken(): PrivateToken
+    {
+        return PrivateToken::fromArray($this->request('POST', '/api/v1/private-token'));
     }
 
     public function deposit(string $projectUuid, string $composerLock): DepositRun
