@@ -16,6 +16,7 @@ final readonly class DepositRun
         public int $packagesDeposited,
         public int $packagesFailed,
         public int $packagesSkipped,
+        public int $packagesPrivate,
         public ?string $startedAt,
         public ?string $finishedAt,
         public ?array $items = null,
@@ -42,6 +43,7 @@ final readonly class DepositRun
             (int) ($data['packages_deposited'] ?? 0),
             (int) ($data['packages_failed'] ?? 0),
             (int) ($data['packages_skipped'] ?? 0),
+            (int) ($data['packages_private'] ?? 0),
             is_string($data['started_at'] ?? null) ? $data['started_at'] : null,
             is_string($data['finished_at'] ?? null) ? $data['finished_at'] : null,
             $items,
@@ -51,5 +53,21 @@ final readonly class DepositRun
     public function isFinished(): bool
     {
         return in_array($this->status, ['completed', 'failed'], true);
+    }
+
+    public function coverablePackages(): int
+    {
+        return max(0, $this->packagesTotal - $this->packagesPrivate);
+    }
+
+    public function depositPercentage(): int
+    {
+        $coverable = $this->coverablePackages();
+
+        if ($coverable === 0) {
+            return $this->packagesTotal > 0 ? 100 : 0;
+        }
+
+        return (int) floor($this->packagesDeposited / $coverable * 100);
     }
 }

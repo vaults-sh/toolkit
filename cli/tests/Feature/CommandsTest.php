@@ -466,3 +466,86 @@ it('opens the dashboard for the connect command', function () {
         ->expectsOutputToContain('Connections')
         ->assertExitCode(0);
 });
+
+it('reports private packages separately in the deposit summary', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 3]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 3, 'packages_deposited' => 2, 'packages_skipped' => 1, 'packages_private' => 1]]);
+    $this->transport->queueJson([
+        'composer_lock' => '{"packages":[]}',
+        'repositories' => [
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
+        ],
+    ]);
+
+    $this->artisan('deposit')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('Private (served from your team repository): 1')
+        ->expectsOutputToContain('Coverage: 100% of 2 coverable packages.')
+        ->assertExitCode(0);
+});
+
+it('lists private access keys', function () {
+    $this->transport->queueJson(['data' => [
+        ['uuid' => 'key-1', 'name' => 'CI', 'project' => ['uuid' => 'p', 'name' => 'Shop'], 'packages' => ['acme/lib'], 'expires_at' => '2027-03-01T00:00:00Z'],
+    ]]);
+
+    $this->artisan('private:keys')
+        ->expectsTable(['Key', 'Name', 'Scope', 'Expires'], [['key-1', 'CI', 'Shop · acme/lib', '2027-03-01']])
+        ->assertExitCode(0);
+});
+
+it('creates a private access key and prints the auth.json snippet once', function () {
+    $this->transport->queueJson(['data' => ['uuid' => 'key-2', 'name' => 'GitHub Actions', 'project' => null, 'packages' => null, 'expires_at' => '2027-09-07T00:00:00Z'], 'token' => 'signed.key', 'host' => 'private.vaults-edge.net'], 201);
+
+    $this->artisan('private:keys:create', ['name' => 'GitHub Actions', '--expires' => '365', '--package' => ['acme/lib']])
+        ->expectsOutputToContain('Created private access key "GitHub Actions" (key-2)')
+        ->expectsOutputToContain('{"bearer":{"private.vaults-edge.net":"signed.key"}}')
+        ->expectsOutputToContain('vaults private:keys:revoke key-2')
+        ->assertExitCode(0)
+        ->run();
+
+    $request = $this->transport->lastRequest();
+
+    expect($request->method)->toBe('POST')
+        ->and($request->url)->toBe('https://vaults.test/api/v1/private-keys')
+        ->and(json_decode((string) $request->body, true))->toBe(['name' => 'GitHub Actions', 'expires_in_days' => 365, 'packages' => ['acme/lib']]);
+});
+
+it('writes a created key straight into auth.json with --write', function () {
+    $this->transport->queueJson(['data' => ['uuid' => 'key-3', 'name' => 'deploy', 'project' => null, 'packages' => null, 'expires_at' => null], 'token' => 'signed.key', 'host' => 'private.vaults-edge.net'], 201);
+
+    $this->artisan('private:keys:create', ['name' => 'deploy', '--write' => true])
+        ->expectsOutputToContain('Wrote the key to')
+        ->doesntExpectOutputToContain('signed.key')
+        ->assertExitCode(0)
+        ->run();
+
+    $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+
+    expect($auth['bearer']['private.vaults-edge.net'])->toBe('signed.key');
+});
+
+it('rejects an out-of-range expiry before calling the api', function () {
+    $this->artisan('private:keys:create', ['name' => 'x', '--expires' => '9999'])
+        ->expectsOutputToContain('--expires must be between 1 and 730 days.')
+        ->assertExitCode(1)
+        ->run();
+
+    expect($this->transport->requests)->toBe([]);
+});
+
+it('revokes a private access key', function () {
+    $this->transport->queueJson([], 204);
+
+    $this->artisan('private:keys:revoke', ['key' => 'key-1'])
+        ->expectsOutputToContain('Key revoked.')
+        ->assertExitCode(0)
+        ->run();
+
+    expect($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/private-keys/key-1')
+        ->and($this->transport->lastRequest()->method)->toBe('DELETE');
+});

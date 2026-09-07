@@ -101,7 +101,8 @@ class DepositCommand extends Command
 
         $run = $this->awaitRun($client, $this->laravel->make(Sleeper::class), $run);
 
-        $this->line('Deposited: '.$run->packagesDeposited.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed);
+        $this->line('Deposited: '.$run->packagesDeposited.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed.($run->packagesPrivate > 0 ? ' · Private (served from your team repository): '.$run->packagesPrivate : ''));
+        $this->line('Coverage: '.$run->depositPercentage().'% of '.$run->coverablePackages().' coverable packages.');
 
         if ($run->status !== 'completed') {
             $this->error('The deposit run failed. See the dashboard for details.');
@@ -152,7 +153,7 @@ class DepositCommand extends Command
             $done = min($total, $run->packagesDeposited + $run->packagesSkipped + $run->packagesFailed);
 
             if ($done > $reported) {
-                $progress->hint($run->packagesDeposited.' deposited · '.$run->packagesSkipped.' skipped · '.$run->packagesFailed.' failed');
+                $progress->hint($run->packagesDeposited.' deposited · '.$run->packagesSkipped.' skipped'.($run->packagesPrivate > 0 ? ' ('.$run->packagesPrivate.' private)' : '').' · '.$run->packagesFailed.' failed');
                 $progress->advance($done - $reported);
                 $reported = $done;
             }

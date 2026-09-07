@@ -10,6 +10,7 @@ use Vaults\Result\CheckResult;
 use Vaults\Result\DepositRun;
 use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
+use Vaults\Result\PrivateKey;
 use Vaults\Result\PrivateToken;
 use Vaults\Result\Project;
 use Vaults\Result\RewrittenLock;
@@ -114,6 +115,52 @@ final class VaultsClient
     public function createPrivateToken(): PrivateToken
     {
         return PrivateToken::fromArray($this->request('POST', '/api/v1/private-token'));
+    }
+
+    /**
+     * @return list<PrivateKey>
+     */
+    public function listPrivateKeys(): array
+    {
+        $response = $this->send('GET', '/api/v1/private-keys');
+        $data = $this->decodeEnvelope($response);
+
+        return array_values(array_map(
+            fn (array $key): PrivateKey => PrivateKey::fromArray($key),
+            array_filter(is_array($data) ? $data : [], 'is_array'),
+        ));
+    }
+
+    /**
+     * @param  list<string>  $packages
+     */
+    public function createPrivateKey(string $name, ?string $projectUuid = null, array $packages = [], int $expiresInDays = 365): PrivateKey
+    {
+        $payload = ['name' => $name, 'expires_in_days' => $expiresInDays];
+
+        if ($projectUuid !== null) {
+            $payload['project'] = $projectUuid;
+        }
+
+        if ($packages !== []) {
+            $payload['packages'] = array_values($packages);
+        }
+
+        $response = $this->send('POST', '/api/v1/private-keys', $payload);
+        $this->guard($response);
+        $body = $response->json();
+        $data = is_array($body['data'] ?? null) ? $body['data'] : [];
+
+        return PrivateKey::fromArray(
+            $data,
+            is_string($body['token'] ?? null) ? $body['token'] : null,
+            is_string($body['host'] ?? null) ? $body['host'] : null,
+        );
+    }
+
+    public function revokePrivateKey(string $keyUuid): void
+    {
+        $this->guard($this->send('DELETE', '/api/v1/private-keys/'.$keyUuid));
     }
 
     public function deposit(string $projectUuid, string $composerLock): DepositRun

@@ -39,4 +39,15 @@ final class FakeTransport implements Transport
 
         return $response;
     }
+
+    public function lastRequest(): HttpRequest
+    {
+        $request = end($this->requests);
+
+        if ($request === false) {
+            throw new RuntimeException('No requests were sent.');
+        }
+
+        return $request;
+    }
 }

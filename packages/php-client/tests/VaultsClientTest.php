@@ -165,3 +165,41 @@ it('prefers an explicit base url over the default', function () {
 
     expect($transport->lastRequest()->url)->toBe('https://custom.test/api/v1/ping');
 });
+
+it('exposes the private package count on a deposit run and derives coverage from it', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['data' => ['uuid' => 'run', 'status' => 'completed', 'packages_total' => 4, 'packages_deposited' => 3, 'packages_skipped' => 1, 'packages_private' => 1]]);
+
+    $run = fakeClient($transport)->getRun('run');
+
+    expect($run->packagesPrivate)->toBe(1)
+        ->and($run->coverablePackages())->toBe(3)
+        ->and($run->depositPercentage())->toBe(100);
+});
+
+it('lists, creates, and revokes private keys', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['data' => [['uuid' => 'k1', 'name' => 'ci', 'project' => ['uuid' => 'p', 'name' => 'Shop'], 'packages' => ['acme/lib'], 'expires_at' => '2027-01-01T00:00:00Z', 'created_at' => '2026-09-07T00:00:00Z']]]);
+    $transport->queueJson(['data' => ['uuid' => 'k2', 'name' => 'deploy', 'project' => null, 'packages' => null, 'expires_at' => '2027-01-01T00:00:00Z'], 'token' => 'signed.token', 'host' => 'private.vaults-edge.net'], 201);
+    $transport->queueJson([], 204);
+
+    $client = fakeClient($transport);
+
+    $keys = $client->listPrivateKeys();
+
+    expect($keys)->toHaveCount(1)
+        ->and($keys[0]->scopeLabel())->toBe('Shop · acme/lib');
+
+    $created = $client->createPrivateKey('deploy', 'project-uuid', ['acme/lib'], 90);
+
+    expect($created->token)->toBe('signed.token')
+        ->and($created->host)->toBe('private.vaults-edge.net')
+        ->and($created->scopeLabel())->toBe('all private packages')
+        ->and($transport->requests[1]->method)->toBe('POST')
+        ->and(json_decode((string) $transport->requests[1]->body, true))->toBe(['name' => 'deploy', 'expires_in_days' => 90, 'project' => 'project-uuid', 'packages' => ['acme/lib']]);
+
+    $client->revokePrivateKey('k2');
+
+    expect($transport->lastRequest()->method)->toBe('DELETE')
+        ->and($transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/private-keys/k2');
+});
