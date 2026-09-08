@@ -6,11 +6,11 @@ namespace Vaults\ComposerPlugin;
 
 use Composer\Command\BaseCommand;
 use Composer\Plugin\Capability\CommandProvider as CommandProviderCapability;
-use Vaults\ComposerPlugin\Commands\ConnectCommand;
 use Vaults\ComposerPlugin\Commands\DoctorCommand;
 use Vaults\ComposerPlugin\Commands\InitCommand;
 use Vaults\ComposerPlugin\Commands\LoginCommand;
 use Vaults\ComposerPlugin\Commands\LogoutCommand;
+use Vaults\ComposerPlugin\Commands\OpenCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
@@ -33,7 +33,7 @@ final class CommandProvider implements CommandProviderCapability
             new InitCommand,
             new StatusCommand,
             new DoctorCommand,
-            new ConnectCommand,
+            new OpenCommand,
             new PrivateLinkCommand,
             new PrivateKeysCommand,
             new PrivateKeysCreateCommand,

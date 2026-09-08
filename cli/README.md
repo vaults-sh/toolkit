@@ -29,7 +29,7 @@ Every command also checks for a newer release at most once a day and prints a on
 | `vaults deposit --check` | Read-only deposit report; exit code 1 if anything is undeposited (CI-friendly). |
 | `vaults status` | Deposit status of the project in the current directory. |
 | `vaults doctor` | Connectivity diagnosis: API, auth, DNS, and edge health. |
-| `vaults connect` | Open the dashboard to connect GitHub, GitLab or Bitbucket and choose repositories to host. |
+| `vaults open` | Open the Vaults dashboard in your browser. |
 | `vaults private:link` | Create a revocable key named after this machine (one year by default, `--expires`, `--name`) and wire `composer.json` plus `auth.json`; re-running rotates it. `--global` writes your user's `auth.json`. |
 | `vaults private:keys` | List private access keys. |
 | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write`. |
@@ -39,7 +39,7 @@ Every command also checks for a newer release at most once a day and prints a on
 
 No UUIDs needed: any command that requires a project will walk you through picking or creating one by name, then remembers it, and its team, in a committed `.vaults.json`. CI authenticates with the `VAULTS_TOKEN` environment variable and uses `--project=<uuid>` or the committed manifest.
 
-Both `vaults login` and `vaults connect` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
+Both `vaults login` and `vaults open` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
 
 ## Working with several teams
 

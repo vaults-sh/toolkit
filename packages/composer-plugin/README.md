@@ -31,7 +31,7 @@ composer vaults:teams [--use=...]            # teams stored on this machine, and
 composer vaults:init [--project=<uuid>]      # link this directory without depositing
 composer vaults:status [--project=<uuid>]
 composer vaults:doctor                       # API, auth, DNS and edge health
-composer vaults:connect                      # open the dashboard to connect GitHub/GitLab/Bitbucket
+composer vaults:open                         # open the Vaults dashboard in your browser
 ```
 
 ## Private packages
@@ -50,7 +50,7 @@ composer vaults:private:keys:revoke <key-uuid>
 
 After wiring private access it offers to route public packages through this project's Vaults repository too, depositing first if the repository does not exist yet. That repository serves only the versions Vaults verified for your lockfile. `--with-public` and `--no-public` skip the question.
 
-`composer vaults:login` and `composer vaults:connect` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
+`composer vaults:login` and `composer vaults:open` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
 
 Credentials are stored once per machine with one entry per team. Log in once per team you work with; each project's committed `.vaults.json` records its team, so every command in that directory uses the right one automatically.
 

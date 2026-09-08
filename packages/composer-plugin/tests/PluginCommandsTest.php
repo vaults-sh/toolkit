@@ -10,11 +10,11 @@ use Tests\Support\FakeIO;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
 use Vaults\Composer\ComposerConfigWriter;
-use Vaults\ComposerPlugin\Commands\ConnectCommand;
 use Vaults\ComposerPlugin\Commands\DoctorCommand;
 use Vaults\ComposerPlugin\Commands\InitCommand;
 use Vaults\ComposerPlugin\Commands\LoginCommand;
 use Vaults\ComposerPlugin\Commands\LogoutCommand;
+use Vaults\ComposerPlugin\Commands\OpenCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
@@ -96,7 +96,7 @@ it('registers every command under the vaults namespace with deposit kept as an a
         'vaults:init',
         'vaults:status',
         'vaults:doctor',
-        'vaults:connect',
+        'vaults:open',
         'vaults:private:link',
         'vaults:private:keys',
         'vaults:private:keys:create',
@@ -228,12 +228,19 @@ it('fails doctor when the edge is unhealthy', function () {
         ->and($tester->getDisplay())->toContain('Some checks failed.');
 });
 
-it('points the connect command at the dashboard', function () {
-    $tester = ($this->tester)(ConnectCommand::class);
+it('opens the dashboard and says when the directory is unlinked', function () {
+    $tester = ($this->tester)(OpenCommand::class);
 
     expect($tester->execute([], ['interactive' => false]))->toBe(0)
-        ->and($tester->getDisplay())->toContain('Connections')
-        ->and($tester->getDisplay())->toContain('composer vaults:private:link');
+        ->and($tester->getDisplay())->toContain('Opening https://vaults.sh/dashboard')
+        ->and($tester->getDisplay())->toContain('not linked to a project');
+
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $tester = ($this->tester)(OpenCommand::class);
+
+    expect($tester->execute([], ['interactive' => false]))->toBe(0)
+        ->and($tester->getDisplay())->not->toContain('not linked to a project');
 });
 
 function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-09-08T00:00:00Z', array $existing = []): void

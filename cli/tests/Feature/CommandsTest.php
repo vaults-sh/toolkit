@@ -591,10 +591,18 @@ it('records the team in the manifest when linking a project', function () {
     expect(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'project-uuid', 'team' => 'acme-uuid']);
 });
 
-it('opens the dashboard for the connect command', function () {
-    $this->artisan('connect')
-        ->expectsOutputToContain('Connections')
+it('opens the dashboard and says when the directory is unlinked', function () {
+    $this->artisan('open')
+        ->expectsOutputToContain('Opening https://vaults.sh/dashboard')
+        ->expectsOutputToContain('not linked to a project')
         ->assertExitCode(0);
+
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->artisan('open')
+        ->doesntExpectOutputToContain('not linked to a project')
+        ->assertExitCode(0)
+        ->run();
 });
 
 it('reports private packages separately in the deposit summary', function () {
