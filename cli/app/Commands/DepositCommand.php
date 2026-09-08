@@ -173,7 +173,7 @@ class DepositCommand extends Command
         }
 
         if (resolve(ComposerConfigWriter::class)->hasRepository($directory, $url)) {
-            $this->line('<fg=green>✓</> The Vaults repository is already configured in composer.json.');
+            $this->line('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
 
             return;
         }

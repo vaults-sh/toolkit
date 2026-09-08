@@ -153,7 +153,7 @@ final class DepositCommand extends VaultsCommand
         }
 
         if (ComposerJsonRepositories::has($directory, $projectRepository)) {
-            $output->writeln('<fg=green>✓</> The Vaults repository is already configured in composer.json.');
+            $output->writeln('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
 
             return;
         }

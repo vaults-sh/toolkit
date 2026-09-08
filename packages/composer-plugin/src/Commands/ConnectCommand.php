@@ -21,14 +21,15 @@ final class ConnectCommand extends VaultsCommand
         $base = is_string($appUrl) && $appUrl !== '' ? rtrim($appUrl, '/') : 'https://vaults.sh';
 
         $output->writeln('Connecting a provider happens in your browser.');
-        $output->writeln('Open '.$base.' and go to your team\'s Connections page.');
+        $output->writeln('Open '.$base.', add the provider under Team settings -> Connections, then pick the');
+        $output->writeln('repositories to host on the Private Packages page.');
 
         if ($input->isInteractive()) {
             $this->openBrowser($base);
         }
 
         $output->writeln('');
-        $output->writeln('Once a provider is connected and repositories are selected, run "composer vaults:private:link" here to install them.');
+        $output->writeln('Once a repository is hosted, run "composer vaults:private:link" here to install its packages.');
 
         return self::SUCCESS;
     }

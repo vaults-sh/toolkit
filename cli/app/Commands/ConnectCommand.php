@@ -18,14 +18,15 @@ class ConnectCommand extends Command
         $base = is_string($appUrl) && $appUrl !== '' ? rtrim($appUrl, '/') : 'https://vaults.sh';
 
         $this->line('Connecting a provider happens in your browser.');
-        $this->line('Open '.$base.' and go to your team\'s Connections page.');
+        $this->line('Open '.$base.', add the provider under Team settings -> Connections, then pick the');
+        $this->line('repositories to host on the Private Packages page.');
 
         if ($this->input->isInteractive()) {
             $this->openBrowser($base);
         }
 
         $this->newLine();
-        $this->line('Once a provider is connected and repositories are selected, run vaults private:link here to install them.');
+        $this->line('Once a repository is hosted, run vaults private:link here to install its packages.');
 
         return self::SUCCESS;
     }

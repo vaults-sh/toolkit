@@ -15,7 +15,7 @@ final class LoginCommand extends VaultsCommand
     protected function configure(): void
     {
         $this->setName('vaults:login')
-            ->setDescription('Authenticate Composer with your Vaults team')
+            ->setDescription('Add a Vaults team to this machine (run once per team you work with)')
             ->addOption('token', null, InputOption::VALUE_REQUIRED, 'Authenticate with an existing team API token');
     }
 
@@ -34,6 +34,7 @@ final class LoginCommand extends VaultsCommand
 
             $this->store()->save($pasted, $team);
             $output->writeln('Logged in to team: '.($team->name ?? 'unknown'));
+            $this->explainTeams($output);
 
             return self::SUCCESS;
         }
@@ -44,6 +45,21 @@ final class LoginCommand extends VaultsCommand
             return self::FAILURE;
         }
 
-        return $this->deviceLogin($output) === null ? self::FAILURE : self::SUCCESS;
+        if ($this->deviceLogin($output) === null) {
+            return self::FAILURE;
+        }
+
+        $this->explainTeams($output);
+
+        return self::SUCCESS;
+    }
+
+    private function explainTeams(OutputInterface $output): void
+    {
+        $teams = $this->store()->teams();
+
+        if (count($teams) > 1) {
+            $output->writeln('This machine now holds '.count($teams).' teams. Projects use the team recorded in .vaults.json; run "composer vaults:teams" to see them.');
+        }
     }
 }
