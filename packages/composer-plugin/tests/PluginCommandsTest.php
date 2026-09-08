@@ -355,7 +355,7 @@ it('deposits automatically when the public repository is not published yet', fun
     queueCreatedKey($this->transport, 'vault-key-xyz');
     $this->transport->queueJson(publishedProject(false));
     $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 0, 'packages_deposited' => 0]], 202);
-    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => [], 'global' => []]]);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => []]]);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
 

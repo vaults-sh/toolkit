@@ -135,15 +135,15 @@ it('fetches the rewritten lock with repository snippets', function () {
     $transport->queueJson([
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
-            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global', 'canonical' => false],
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc', 'canonical' => false],
         ],
     ]);
 
     $lock = fakeClient($transport)->getRewrittenLock('run-uuid');
 
     expect($lock->composerLock)->toBe('{"packages":[]}')
-        ->and($lock->globalRepository['canonical'])->toBeFalse();
+        ->and($lock->projectRepository['url'])->toBe('https://repo.vaults-edge.net/repo/projects/abc')
+        ->and($lock->projectRepository['canonical'])->toBeFalse();
 });
 
 it('throws typed exceptions for auth and api failures', function () {

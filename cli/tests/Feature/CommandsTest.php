@@ -103,7 +103,6 @@ it('runs a full deposit and writes the lock with --write', function () {
         'composer_lock' => '{"packages":[],"rewritten":true}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -292,7 +291,6 @@ it('offers to wire composer.json after an interactive deposit', function () {
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -347,7 +345,6 @@ it('skips the wiring offer when the repository is already configured', function 
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -367,7 +364,6 @@ it('waits for the real package total before showing progress', function () {
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -390,7 +386,6 @@ it('refreshes the lock content hash to match the wired composer.json', function 
         'composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": []}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -503,7 +498,7 @@ it('deposits automatically when the public repository is not published yet', fun
     queueCreatedKey($this->transport, 'vault-key-xyz');
     $this->transport->queueJson(publishedProject(false));
     $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 0, 'packages_deposited' => 0]], 202);
-    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => [], 'global' => []]]);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => []]]);
 
     $this->artisan('private:link', ['--with-public' => true, '--no-interaction' => true])
         ->expectsOutputToContain('Depositing this project so its repository exists')
@@ -612,7 +607,6 @@ it('reports private packages separately in the deposit summary', function () {
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 

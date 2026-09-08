@@ -75,7 +75,6 @@ it('runs a full deposit and writes the lock', function () {
         'composer_lock' => '{"packages":[],"rewritten":true}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -241,7 +240,6 @@ it('wires the repository into composer.json after an interactive deposit', funct
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -277,7 +275,6 @@ it('skips the wiring offer when the repository is already configured', function 
         'composer_lock' => '{"packages":[]}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
@@ -300,7 +297,6 @@ it('refreshes the lock content hash to match the wired composer.json', function 
         'composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": []}',
         'repositories' => [
             'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
-            'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global'],
         ],
     ]);
 
