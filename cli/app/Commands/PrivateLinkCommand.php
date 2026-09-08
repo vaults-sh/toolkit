@@ -11,6 +11,7 @@ use Vaults\Composer\PrivateLink;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
+use Vaults\Result\Project;
 use Vaults\VaultsClient;
 
 use function Laravel\Prompts\confirm;
@@ -101,50 +102,67 @@ class PrivateLinkCommand extends Command
 
     private function offerPublicMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void
     {
-        $choice = $this->publicMirrorChoice();
+        if ($this->option('no-public')) {
+            return;
+        }
 
-        if ($choice === 'none') {
+        $project = $this->linkedProject($client, $manifest, $directory);
+        $url = $project?->repositorySnippet['url'] ?? null;
+
+        if (is_string($url) && $url !== '' && $writer->hasRepository($directory, $url)) {
+            $this->line('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
+
+            return;
+        }
+
+        $wanted = $this->option('with-public')
+            || ($this->input->isInteractive() && confirm('Also install public packages through your Vaults mirror?'));
+
+        if (! $wanted) {
             $this->line('Run vaults deposit later to route public packages through Vaults as well.');
 
             return;
         }
 
-        $this->wireProjectMirror($client, $writer, $manifest, $directory);
+        $this->wireProjectMirror($client, $writer, $manifest, $directory, $project);
     }
 
-    private function publicMirrorChoice(): string
+    private function linkedProject(VaultsClient $client, ProjectManifest $manifest, string $directory): ?Project
     {
-        if ($this->option('no-public')) {
-            return 'none';
+        $projectUuid = $this->option('project');
+        $projectUuid = is_string($projectUuid) && $projectUuid !== '' ? $projectUuid : $manifest->load($directory);
+
+        if ($projectUuid === null) {
+            return null;
         }
 
-        if ($this->option('with-public')) {
-            return 'project';
+        try {
+            return $client->findProject($projectUuid);
+        } catch (VaultsException) {
+            return null;
         }
-
-        return $this->input->isInteractive() && confirm('Also install public packages through your Vaults mirror?')
-            ? 'project'
-            : 'none';
     }
 
-    private function wireProjectMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void
+    private function wireProjectMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory, ?Project $project): void
     {
         try {
-            $projectUuid = $this->resolveProject($client, $manifest, $directory);
+            if ($project === null) {
+                $projectUuid = $this->resolveProject($client, $manifest, $directory);
 
-            if ($projectUuid === null) {
-                return;
+                if ($projectUuid === null) {
+                    return;
+                }
+
+                $project = $client->findProject($projectUuid);
+
+                if ($project === null) {
+                    $this->error('Project '.$projectUuid.' was not found for your team.');
+
+                    return;
+                }
             }
-
-            $project = $client->findProject($projectUuid);
         } catch (VaultsException $exception) {
             $this->error($exception->getMessage());
-
-            return;
-        }
-
-        if ($project === null) {
-            $this->error('Project '.$projectUuid.' was not found for your team.');
 
             return;
         }

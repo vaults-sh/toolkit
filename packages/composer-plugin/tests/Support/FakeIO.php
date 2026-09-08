@@ -14,6 +14,16 @@ final class FakeIO extends NullIO
     /** @var list<string> */
     public array $questions = [];
 
+    /** @var list<string> */
+    public array $written = [];
+
+    public function write($messages, bool $newline = true, int $verbosity = self::NORMAL): void
+    {
+        foreach ((array) $messages as $message) {
+            $this->written[] = (string) $message;
+        }
+    }
+
     public function queue(mixed $answer): self
     {
         $this->answers[] = $answer;

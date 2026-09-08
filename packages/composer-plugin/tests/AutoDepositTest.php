@@ -35,7 +35,7 @@ function testablePlugin(FakeTransport $transport, TokenStore $store, string $dir
     };
 }
 
-function updateEvent(array $extra = []): Event
+function updateEvent(array $extra = [], ?FakeIO $io = null): Event
 {
     $rootPackage = new RootPackage('vaults-test/root', '1.0.0.0', '1.0.0');
     $rootPackage->setExtra($extra);
@@ -43,7 +43,7 @@ function updateEvent(array $extra = []): Event
     $composer = new Composer;
     $composer->setPackage($rootPackage);
 
-    return new Event(ScriptEvents::POST_UPDATE_CMD, $composer, new FakeIO);
+    return new Event(ScriptEvents::POST_UPDATE_CMD, $composer, $io ?? new FakeIO);
 }
 
 beforeEach(function () {
@@ -110,3 +110,20 @@ it('never throws even when the api fails', function () {
 
     testablePlugin($this->transport, $this->store, $this->workDir)->onPostUpdate(updateEvent());
 })->throwsNoExceptions();
+
+it('announces the background deposit without guessing a package count', function () {
+    $this->store->save('test-token');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 0]], 202);
+
+    $io = new FakeIO;
+    testablePlugin($this->transport, $this->store, $this->workDir)->onPostUpdate(updateEvent(io: $io));
+
+    $written = implode("\n", $io->written);
+
+    expect($written)->toContain('depositing composer.lock in the background')
+        ->and($written)->toContain('composer vaults:deposit --write')
+        ->and($written)->not->toContain('0 packages');
+});

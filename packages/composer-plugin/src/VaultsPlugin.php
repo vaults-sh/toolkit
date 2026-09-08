@@ -81,7 +81,7 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
 
         $run = $this->client()->withToken($token)->deposit($projectUuid, (string) file_get_contents($lockPath));
 
-        $io->write('<info>Vaults:</info> depositing '.$run->packagesTotal.' packages in the background. Run "composer deposit --write" to pin composer.lock to Vaults.');
+        $io->write('<info>Vaults:</info> depositing composer.lock in the background. Run "composer vaults:deposit --write" to pin composer.lock to Vaults.');
     }
 
     protected function workingDirectory(): string

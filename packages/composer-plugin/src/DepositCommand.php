@@ -83,7 +83,7 @@ final class DepositCommand extends VaultsCommand
         $output->writeln($result->deposited.'/'.$result->total.' deposited, '.$result->undeposited.' undeposited.');
 
         if (! $result->isFullyDeposited()) {
-            $output->writeln('<comment>Run "composer deposit" to deposit the remaining packages.</comment>');
+            $output->writeln('<comment>Run "composer vaults:deposit" to deposit the remaining packages.</comment>');
 
             return self::FAILURE;
         }
@@ -124,7 +124,7 @@ final class DepositCommand extends VaultsCommand
             file_put_contents($lockPath, $this->withRefreshedContentHash($rewritten->composerLock, $directory));
             $output->writeln('<info>composer.lock rewritten to install from Vaults. Run composer install.</info>');
         } else {
-            $output->writeln('Run "composer deposit --write" to rewrite composer.lock, then "composer install".');
+            $output->writeln('Run "composer vaults:deposit --write" to rewrite composer.lock, then "composer install".');
         }
 
         return self::SUCCESS;

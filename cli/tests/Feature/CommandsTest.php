@@ -678,3 +678,23 @@ it('revokes a private access key', function () {
     expect($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/private-keys/key-1')
         ->and($this->transport->lastRequest()->method)->toBe('DELETE');
 });
+
+it('never asks about the public mirror when the repository is already configured', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.json', json_encode([
+        'repositories' => [
+            ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+            ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/project-uuid', 'canonical' => false],
+        ],
+    ], JSON_PRETTY_PRINT));
+
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(true));
+
+    $this->artisan('private:link')
+        ->expectsOutputToContain('The public Vaults repository is already configured')
+        ->assertExitCode(0)
+        ->run();
+
+    expect($this->transport->requests)->toHaveCount(3);
+});

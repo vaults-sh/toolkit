@@ -1,6 +1,6 @@
 # Vaults Composer Plugin
 
-Adds `composer deposit` and the `composer vaults:*` commands to any project, so you can deposit your `composer.lock` with [Vaults](https://vaults.sh) resilient Composer infrastructure and manage private packages without leaving Composer.
+Adds the `composer vaults:*` commands to any project, so you can deposit your `composer.lock` with [Vaults](https://vaults.sh) resilient Composer infrastructure and manage private packages without leaving Composer.
 
 The plugin is optional and is never required for installs: once a project is deposited, `composer install` works from the Vaults edge with no plugin, no CLI, and no Vaults control plane involved.
 
@@ -13,10 +13,12 @@ composer require --dev vaults/composer-plugin
 ## Usage
 
 ```bash
-composer deposit            # deposit everything in composer.lock
-composer deposit --check    # read-only report; exit code 1 if anything is undeposited
-composer deposit --write    # also rewrite composer.lock to install from Vaults
+composer vaults:deposit            # deposit everything in composer.lock
+composer vaults:deposit --check    # read-only report; exit code 1 if anything is undeposited
+composer vaults:deposit --write    # also rewrite composer.lock to install from Vaults
 ```
+
+`composer deposit` is a shorter alias for `composer vaults:deposit`.
 
 Everything is built in: run `composer deposit` in a terminal and it walks you through a browser device login, then lets you pick an existing Vaults project or create one by name, with no UUIDs and no dashboard required. The committed `.vaults.json` remembers the link, and after depositing it offers to add the Vaults repository to composer.json for you. CI uses `VAULTS_TOKEN` plus the committed manifest (or `--project=<uuid>`). The Vaults CLI is optional and shares the same credentials.
 

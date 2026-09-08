@@ -480,3 +480,21 @@ it('opens the approval page during device login', function () {
         ->and($command->opened)->toBe(['https://vaults.test/device?code=ABCD-EFGH'])
         ->and($output->fetch())->toContain('ABCD-EFGH');
 });
+
+it('never asks about the public mirror when the repository is already configured', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.json', json_encode([
+        'name' => 'acme/consumer',
+        'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/project-uuid', 'canonical' => false]],
+    ], JSON_PRETTY_PRINT));
+
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(true));
+
+    $tester = ($this->tester)(PrivateLinkCommand::class);
+    $exit = $tester->execute([], ['interactive' => true]);
+
+    expect($exit)->toBe(0)
+        ->and($tester->getDisplay())->toContain('The public Vaults repository is already configured')
+        ->and($this->io->questions)->toBe([]);
+});

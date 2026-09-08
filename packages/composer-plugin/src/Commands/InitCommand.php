@@ -28,7 +28,7 @@ final class InitCommand extends VaultsCommand
         $override = $input->getOption('project');
 
         if ($manifest->load($directory) !== null && ! (is_string($override) && $override !== '')) {
-            $output->writeln('<info>This directory is already linked (.vaults.json). Run "composer vaults:status" or "composer deposit --check".</info>');
+            $output->writeln('<info>This directory is already linked (.vaults.json). Run "composer vaults:status" or "composer vaults:deposit --check".</info>');
 
             return self::SUCCESS;
         }
@@ -50,7 +50,7 @@ final class InitCommand extends VaultsCommand
             return self::FAILURE;
         }
 
-        $output->writeln('Next: "composer deposit --check" to see what needs depositing, or "composer deposit" to deposit everything.');
+        $output->writeln('Next: "composer vaults:deposit --check" to see what needs depositing, or "composer vaults:deposit" to deposit everything.');
 
         return self::SUCCESS;
     }

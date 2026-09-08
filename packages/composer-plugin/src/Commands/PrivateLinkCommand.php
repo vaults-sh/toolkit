@@ -15,6 +15,7 @@ use Vaults\ComposerPlugin\Support\ProjectLinker;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
+use Vaults\Result\Project;
 use Vaults\VaultsClient;
 
 final class PrivateLinkCommand extends VaultsCommand
@@ -104,53 +105,70 @@ final class PrivateLinkCommand extends VaultsCommand
 
     private function offerPublicMirror(VaultsClient $client, InputInterface $input, OutputInterface $output, string $directory): void
     {
-        $choice = $this->publicMirrorChoice($input);
+        if ($input->getOption('no-public')) {
+            return;
+        }
 
-        if ($choice === 'none') {
-            $output->writeln('Run "composer deposit" later to route public packages through Vaults as well.');
+        $project = $this->linkedProject($client, $input, $directory);
+        $repository = $project?->repositorySnippet ?? [];
+        $url = $repository['url'] ?? null;
+
+        if (is_string($url) && $url !== '' && ComposerJsonRepositories::has($directory, $repository)) {
+            $output->writeln('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
 
             return;
         }
 
-        $this->wireProjectMirror($client, $input, $output, $directory);
-    }
+        $wanted = (bool) $input->getOption('with-public')
+            || ($input->isInteractive() && $this->resolveIO()->askConfirmation('Also install public packages through your Vaults mirror? [Y/n] '));
 
-    private function publicMirrorChoice(InputInterface $input): string
-    {
-        if ($input->getOption('no-public')) {
-            return 'none';
+        if (! $wanted) {
+            $output->writeln('Run "composer vaults:deposit" later to route public packages through Vaults as well.');
+
+            return;
         }
 
-        if ($input->getOption('with-public')) {
-            return 'project';
-        }
-
-        return $input->isInteractive() && $this->resolveIO()->askConfirmation('Also install public packages through your Vaults mirror? [Y/n] ')
-            ? 'project'
-            : 'none';
+        $this->wireProjectMirror($client, $input, $output, $directory, $project);
     }
 
-    private function wireProjectMirror(VaultsClient $client, InputInterface $input, OutputInterface $output, string $directory): void
+    private function linkedProject(VaultsClient $client, InputInterface $input, string $directory): ?Project
     {
-        $override = $input->getOption('project');
+        $projectUuid = $input->getOption('project');
+        $projectUuid = is_string($projectUuid) && $projectUuid !== '' ? $projectUuid : (new ProjectManifest)->load($directory);
+
+        if ($projectUuid === null) {
+            return null;
+        }
 
         try {
-            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
-                ->resolve($directory, is_string($override) ? $override : null, $input->isInteractive());
+            return $client->findProject($projectUuid);
+        } catch (VaultsException) {
+            return null;
+        }
+    }
 
-            if ($projectUuid === null) {
-                return;
+    private function wireProjectMirror(VaultsClient $client, InputInterface $input, OutputInterface $output, string $directory, ?Project $project): void
+    {
+        try {
+            if ($project === null) {
+                $override = $input->getOption('project');
+                $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
+                    ->resolve($directory, is_string($override) ? $override : null, $input->isInteractive());
+
+                if ($projectUuid === null) {
+                    return;
+                }
+
+                $project = $client->findProject($projectUuid);
+
+                if ($project === null) {
+                    $output->writeln('<error>Project '.$projectUuid.' was not found for your team.</error>');
+
+                    return;
+                }
             }
-
-            $project = $client->findProject($projectUuid);
         } catch (VaultsException $exception) {
             $this->reportFailure($exception, $output);
-
-            return;
-        }
-
-        if ($project === null) {
-            $output->writeln('<error>Project '.$projectUuid.' was not found for your team.</error>');
 
             return;
         }
