@@ -93,7 +93,7 @@ jobs:
       - name: Rewrite composer.json for publication
         working-directory: packages/composer-plugin
         run: |
-          jq --arg version "${GITHUB_REF_NAME}" 'del(.repositories) | .require["vaults/php-client"] = $version' composer.json > composer.json.tmp
+          jq --arg version "^${GITHUB_REF_NAME}" 'del(.repositories) | .require["vaults/php-client"] = $version' composer.json > composer.json.tmp
           mv composer.json.tmp composer.json
       - uses: symplify/monorepo-split-github-action@v2.4.5
         env:
