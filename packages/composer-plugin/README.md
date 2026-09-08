@@ -36,7 +36,7 @@ composer vaults:connect                      # open the dashboard to connect Git
 
 ```bash
 composer vaults:private:link [--global] [--expires=365] [--name=...]
-                             [--with-public|--global-mirror|--no-public]
+                             [--with-public|--no-public]
                                              # create a key for this machine, wire composer.json and auth.json,
                                              # and offer to route public packages through Vaults too
 composer vaults:private:keys                 # list keys
@@ -46,7 +46,7 @@ composer vaults:private:keys:revoke <key-uuid>
 
 `private:link` creates a revocable key named after your machine, valid for a year by default; re-running it rotates the key. For CI or a client project, create a dedicated key with `private:keys:create` and put it in `COMPOSER_AUTH` or the consuming project's `auth.json`. Never commit `auth.json`.
 
-The public-mirror offer has three answers: this project's mirror (the default, serving only versions Vaults verified for your lockfile, depositing first if needed), the global mirror (no deposit, but your dependencies are not guaranteed to be in it), or no. `--with-public`, `--global-mirror` and `--no-public` skip the question.
+After wiring private access it offers to route public packages through this project's Vaults repository too, depositing first if the repository does not exist yet. That repository serves only the versions Vaults verified for your lockfile. `--with-public` and `--no-public` skip the question.
 
 Credentials are stored once per machine with one entry per team. Log in once per team you work with; each project's committed `.vaults.json` records its team, so every command in that directory uses the right one automatically.
 

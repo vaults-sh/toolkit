@@ -45,9 +45,7 @@ Credentials are stored once per machine, one entry per team. Run `vaults login` 
 
 ## Private packages
 
-`vaults private:link` creates a private access key named after your machine, valid for a year, visible and revocable under Team settings. It adds the private repository to `composer.json` and the key to `auth.json`, then offers to route public packages through Vaults as well, so one command wires everything.
-
-The offer has three answers. **This project's mirror** is the default and the one to pick: it serves only the versions Vaults verified for your lockfile, so every public dependency is guaranteed present. If the project has not been deposited yet, the deposit runs there and then. **The global mirror** serves every package Vaults has ever mirrored; it takes no deposit, but nothing guarantees your dependencies are in it, so Composer would still fall back to Packagist for anything missing. **No** leaves public installs on Packagist. Skip the question with `--with-public`, `--global-mirror` or `--no-public`. Never commit `auth.json`. For CI or a client project, create a dedicated key with `vaults private:keys:create` and put it in `COMPOSER_AUTH` or that project's `auth.json`.
+`vaults private:link` creates a private access key named after your machine, valid for a year, visible and revocable under Team settings. It adds the private repository to `composer.json` and the key to `auth.json`, then offers to route public packages through this project's Vaults repository as well, so one command wires everything. That repository serves only the versions Vaults verified for your lockfile, so every public dependency is guaranteed present; if the project has not been deposited yet, the deposit runs there and then. Skip the question with `--with-public` or `--no-public`. Never commit `auth.json`. For CI or a client project, create a dedicated key with `vaults private:keys:create` and put it in `COMPOSER_AUTH` or that project's `auth.json`.
 
 ## Development
 

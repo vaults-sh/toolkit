@@ -12,7 +12,6 @@ use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
 use Vaults\Result\PrivateKey;
 use Vaults\Result\Project;
-use Vaults\Result\Repositories;
 use Vaults\Result\RewrittenLock;
 use Vaults\Result\TeamIdentity;
 use Vaults\Transport\HttpRequest;
@@ -121,13 +120,6 @@ final class VaultsClient
         ], fn (?string $value): bool => $value !== null);
 
         return Project::fromArray($this->request('POST', '/api/v1/projects', $payload));
-    }
-
-    public function repositories(): Repositories
-    {
-        $response = $this->send('GET', '/api/v1/repositories');
-
-        return Repositories::fromArray($this->decodeEnvelope($response));
     }
 
     /**

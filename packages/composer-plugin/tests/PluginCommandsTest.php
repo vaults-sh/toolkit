@@ -363,25 +363,6 @@ it('deposits automatically when the public repository is not published yet', fun
         ->and($tester->getDisplay())->toContain('Depositing this project so its repository exists');
 });
 
-it('wires the global mirror instead of the project when asked', function () {
-    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"acme/consumer\"\n}\n");
-    queueCreatedKey($this->transport, 'vault-key-xyz');
-    $this->transport->queueJson(['data' => [
-        'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global', 'canonical' => false],
-        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
-    ]]);
-
-    $tester = ($this->tester)(PrivateLinkCommand::class);
-    $exit = $tester->execute(['--global-mirror' => true]);
-
-    $composer = json_decode((string) file_get_contents($this->workDir.'/composer.json'), true);
-    $urls = array_map(fn (array $repository): string => (string) ($repository['url'] ?? ''), array_values($composer['repositories']));
-
-    expect($exit)->toBe(0)
-        ->and($tester->getDisplay())->toContain('Added the global Vaults repository')
-        ->and($urls)->toContain('https://repo.vaults-edge.net/repo/global');
-});
-
 it('skips the public repository entirely with --no-public', function () {
     queueCreatedKey($this->transport, 'vault-key-xyz');
 

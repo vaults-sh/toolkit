@@ -13,7 +13,7 @@ use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
 use Vaults\VaultsClient;
 
-use function Laravel\Prompts\select;
+use function Laravel\Prompts\confirm;
 
 class PrivateLinkCommand extends Command
 {
@@ -24,7 +24,6 @@ class PrivateLinkCommand extends Command
         {--expires=365 : Days until the key expires (1-730)}
         {--name= : Key name shown in team settings (defaults to this machine\'s hostname)}
         {--with-public : Also add this project\'s public Vaults repository without asking}
-        {--global-mirror : Add the global Vaults mirror instead of this project\'s repository}
         {--no-public : Never offer a public Vaults repository}
         {--project= : Project UUID for the public repository (overrides .vaults.json)}';
 
@@ -110,12 +109,6 @@ class PrivateLinkCommand extends Command
             return;
         }
 
-        if ($choice === 'global') {
-            $this->wireGlobalMirror($client, $writer, $directory);
-
-            return;
-        }
-
         $this->wireProjectMirror($client, $writer, $manifest, $directory);
     }
 
@@ -125,39 +118,13 @@ class PrivateLinkCommand extends Command
             return 'none';
         }
 
-        if ($this->option('global-mirror')) {
-            return 'global';
+        if ($this->option('with-public')) {
+            return 'project';
         }
 
-        if ($this->option('with-public') || ! $this->input->isInteractive()) {
-            return $this->option('with-public') ? 'project' : 'none';
-        }
-
-        return select('Also install public packages through your Vaults mirror?', [
-            'project' => 'Yes, this project\'s mirror - only versions Vaults verified for you',
-            'global' => 'Yes, the global mirror - every package Vaults has ever mirrored, yours not guaranteed',
-            'none' => 'No, keep installing public packages from Packagist',
-        ], 'project');
-    }
-
-    private function wireGlobalMirror(VaultsClient $client, ComposerConfigWriter $writer, string $directory): void
-    {
-        try {
-            $url = $client->repositories()->globalUrl();
-        } catch (VaultsException $exception) {
-            $this->error($exception->getMessage());
-
-            return;
-        }
-
-        if ($url === null) {
-            $this->error('The API did not return a global repository url.');
-
-            return;
-        }
-
-        $this->wire($writer, $directory, $url, 'global');
-        $this->line('The global mirror serves whatever Vaults has mirrored. Run vaults deposit to guarantee this project\'s own dependencies.');
+        return $this->input->isInteractive() && confirm('Also install public packages through your Vaults mirror?')
+            ? 'project'
+            : 'none';
     }
 
     private function wireProjectMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void

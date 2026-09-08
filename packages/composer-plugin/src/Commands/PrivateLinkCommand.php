@@ -27,7 +27,6 @@ final class PrivateLinkCommand extends VaultsCommand
             ->addOption('expires', null, InputOption::VALUE_REQUIRED, 'Days until the key expires (1-730)', '365')
             ->addOption('name', null, InputOption::VALUE_REQUIRED, 'Key name shown in team settings (defaults to this machine\'s hostname)')
             ->addOption('with-public', null, InputOption::VALUE_NONE, 'Also add this project\'s public Vaults repository without asking')
-            ->addOption('global-mirror', null, InputOption::VALUE_NONE, 'Add the global Vaults mirror instead of this project\'s repository')
             ->addOption('no-public', null, InputOption::VALUE_NONE, 'Never offer a public Vaults repository')
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project UUID for the public repository (overrides .vaults.json)');
     }
@@ -113,12 +112,6 @@ final class PrivateLinkCommand extends VaultsCommand
             return;
         }
 
-        if ($choice === 'global') {
-            $this->wireGlobalMirror($client, $output, $directory);
-
-            return;
-        }
-
         $this->wireProjectMirror($client, $input, $output, $directory);
     }
 
@@ -128,45 +121,13 @@ final class PrivateLinkCommand extends VaultsCommand
             return 'none';
         }
 
-        if ($input->getOption('global-mirror')) {
-            return 'global';
+        if ($input->getOption('with-public')) {
+            return 'project';
         }
 
-        if ($input->getOption('with-public') || ! $input->isInteractive()) {
-            return $input->getOption('with-public') ? 'project' : 'none';
-        }
-
-        $options = [
-            'project' => 'Yes, this project\'s mirror - only versions Vaults verified for you',
-            'global' => 'Yes, the global mirror - every package Vaults has ever mirrored, yours not guaranteed',
-            'none' => 'No, keep installing public packages from Packagist',
-        ];
-
-        $answer = (string) $this->resolveIO()->select('Also install public packages through your Vaults mirror?', array_values($options), '0');
-
-        return array_keys($options)[(int) $answer] ?? 'project';
-    }
-
-    private function wireGlobalMirror(VaultsClient $client, OutputInterface $output, string $directory): void
-    {
-        try {
-            $repositories = $client->repositories();
-        } catch (VaultsException $exception) {
-            $this->reportFailure($exception, $output);
-
-            return;
-        }
-
-        $url = $repositories->globalUrl();
-
-        if ($url === null) {
-            $output->writeln('<error>The API did not return a global repository url.</error>');
-
-            return;
-        }
-
-        $this->wire($output, $directory, $repositories->global, $url, 'global');
-        $output->writeln('The global mirror serves whatever Vaults has mirrored. Run "composer deposit" to guarantee this project\'s own dependencies.');
+        return $input->isInteractive() && $this->resolveIO()->askConfirmation('Also install public packages through your Vaults mirror? [Y/n] ')
+            ? 'project'
+            : 'none';
     }
 
     private function wireProjectMirror(VaultsClient $client, InputInterface $input, OutputInterface $output, string $directory): void
