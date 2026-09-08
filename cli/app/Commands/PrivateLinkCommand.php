@@ -13,7 +13,7 @@ use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
 use Vaults\VaultsClient;
 
-use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
 
 class PrivateLinkCommand extends Command
 {
@@ -24,7 +24,8 @@ class PrivateLinkCommand extends Command
         {--expires=365 : Days until the key expires (1-730)}
         {--name= : Key name shown in team settings (defaults to this machine\'s hostname)}
         {--with-public : Also add this project\'s public Vaults repository without asking}
-        {--no-public : Never offer the public Vaults repository}
+        {--global-mirror : Add the global Vaults mirror instead of this project\'s repository}
+        {--no-public : Never offer a public Vaults repository}
         {--project= : Project UUID for the public repository (overrides .vaults.json)}';
 
     protected $description = 'Configure this project to install your team\'s private Vaults packages';
@@ -101,29 +102,77 @@ class PrivateLinkCommand extends Command
 
     private function offerPublicMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void
     {
-        if ($this->option('no-public')) {
-            return;
-        }
+        $choice = $this->publicMirrorChoice();
 
-        $wanted = (bool) $this->option('with-public')
-            || ($this->input->isInteractive() && confirm('Also install public packages through your Vaults mirror?'));
-
-        if (! $wanted) {
+        if ($choice === 'none') {
             $this->line('Run vaults deposit later to route public packages through Vaults as well.');
 
             return;
         }
 
+        if ($choice === 'global') {
+            $this->wireGlobalMirror($client, $writer, $directory);
+
+            return;
+        }
+
+        $this->wireProjectMirror($client, $writer, $manifest, $directory);
+    }
+
+    private function publicMirrorChoice(): string
+    {
+        if ($this->option('no-public')) {
+            return 'none';
+        }
+
+        if ($this->option('global-mirror')) {
+            return 'global';
+        }
+
+        if ($this->option('with-public') || ! $this->input->isInteractive()) {
+            return $this->option('with-public') ? 'project' : 'none';
+        }
+
+        return select('Also install public packages through your Vaults mirror?', [
+            'project' => 'Yes, this project\'s mirror - only versions Vaults verified for you',
+            'global' => 'Yes, the global mirror - every package Vaults has ever mirrored, yours not guaranteed',
+            'none' => 'No, keep installing public packages from Packagist',
+        ], 'project');
+    }
+
+    private function wireGlobalMirror(VaultsClient $client, ComposerConfigWriter $writer, string $directory): void
+    {
         try {
-            $projectUuid = $this->resolveProject($client, $manifest, $directory);
-            $project = $projectUuid === null ? null : $client->findProject($projectUuid);
+            $url = $client->repositories()->globalUrl();
         } catch (VaultsException $exception) {
             $this->error($exception->getMessage());
 
             return;
         }
 
-        if ($projectUuid === null) {
+        if ($url === null) {
+            $this->error('The API did not return a global repository url.');
+
+            return;
+        }
+
+        $this->wire($writer, $directory, $url, 'global');
+        $this->line('The global mirror serves whatever Vaults has mirrored. Run vaults deposit to guarantee this project\'s own dependencies.');
+    }
+
+    private function wireProjectMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void
+    {
+        try {
+            $projectUuid = $this->resolveProject($client, $manifest, $directory);
+
+            if ($projectUuid === null) {
+                return;
+            }
+
+            $project = $client->findProject($projectUuid);
+        } catch (VaultsException $exception) {
+            $this->error($exception->getMessage());
+
             return;
         }
 
@@ -133,39 +182,33 @@ class PrivateLinkCommand extends Command
             return;
         }
 
-        if (! $project->repositoryPublished) {
-            if ($this->input->isInteractive() && confirm('This project has not been deposited yet. Deposit it now?')) {
-                $this->call('deposit');
-
-                return;
-            }
-
-            $this->line('Run vaults deposit to publish the project repository; it wires composer.json for you.');
-
-            return;
-        }
-
         $url = $project->repositorySnippet['url'] ?? null;
 
-        if (! is_string($url) || $url === '') {
-            $this->line('Run vaults deposit to publish the project repository; it wires composer.json for you.');
+        if (! $project->repositoryPublished || ! is_string($url) || $url === '') {
+            $this->line('Depositing this project so its repository exists...');
+            $this->call('deposit');
 
             return;
         }
 
+        $this->wire($writer, $directory, $url, 'public');
+    }
+
+    private function wire(ComposerConfigWriter $writer, string $directory, string $url, string $label): void
+    {
         if ($writer->hasRepository($directory, $url)) {
-            $this->line('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
+            $this->line('<fg=green>✓</> The '.$label.' Vaults repository is already configured in composer.json.');
 
             return;
         }
 
         if ($writer->addRepository($directory, $url)) {
-            $this->info('Added the public Vaults repository to composer.json. Commit it along with .vaults.json.');
+            $this->info('Added the '.$label.' Vaults repository to composer.json. Commit it along with .vaults.json.');
 
             return;
         }
 
         $this->error('Could not update composer.json. Add this repository manually:');
-        $this->line('  '.json_encode($project->repositorySnippet, JSON_UNESCAPED_SLASHES));
+        $this->line('  { "type": "composer", "url": "'.$url.'", "canonical": false }');
     }
 }

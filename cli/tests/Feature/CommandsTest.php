@@ -495,16 +495,53 @@ it('also wires the public project repository from private:link when asked', func
         ->and($writer->publicUrl)->toBe('https://repo.vaults-edge.net/repo/projects/project-uuid');
 });
 
-it('points at deposit when the public repository is not published yet', function () {
+it('deposits automatically when the public repository is not published yet', function () {
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', '{"repositories":[{"type":"composer","url":"https://private.vaults-edge.net","canonical":false}]}');
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
 
     queueCreatedKey($this->transport, 'vault-key-xyz');
     $this->transport->queueJson(publishedProject(false));
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 0, 'packages_deposited' => 0]], 202);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => [], 'global' => []]]);
 
     $this->artisan('private:link', ['--with-public' => true, '--no-interaction' => true])
-        ->expectsOutputToContain('Run vaults deposit to publish the project repository')
+        ->expectsOutputToContain('Depositing this project so its repository exists')
         ->assertExitCode(0);
+});
+
+it('wires the global mirror instead of the project when asked', function () {
+    $writer = new class extends ComposerConfigWriter
+    {
+        public ?string $url = null;
+
+        public function addRepository(string $directory, string $url): bool
+        {
+            $this->url = $url;
+
+            return true;
+        }
+
+        public function addPrivateRepository(string $directory, string $url): bool
+        {
+            return true;
+        }
+    };
+    $this->app->instance(ComposerConfigWriter::class, $writer);
+
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(['data' => [
+        'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global', 'canonical' => false],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+    ]]);
+
+    $this->artisan('private:link', ['--global-mirror' => true])
+        ->expectsOutputToContain('Added the global Vaults repository')
+        ->expectsOutputToContain('Run vaults deposit to guarantee')
+        ->assertExitCode(0)
+        ->run();
+
+    expect($writer->url)->toBe('https://repo.vaults-edge.net/repo/global');
 });
 
 it('skips the public repository entirely with --no-public', function () {

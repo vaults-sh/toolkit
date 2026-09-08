@@ -203,3 +203,17 @@ it('lists, creates, and revokes private keys', function () {
     expect($transport->lastRequest()->method)->toBe('DELETE')
         ->and($transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/private-keys/k2');
 });
+
+it('reads the global and private repository snippets', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['data' => [
+        'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global', 'canonical' => false],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+    ]]);
+
+    $repositories = fakeClient($transport)->repositories();
+
+    expect($repositories->globalUrl())->toBe('https://repo.vaults-edge.net/repo/global')
+        ->and($repositories->private['url'])->toBe('https://private.vaults-edge.net')
+        ->and($transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repositories');
+});

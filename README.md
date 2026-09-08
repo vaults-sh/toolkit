@@ -50,7 +50,7 @@ The plugin and the CLI expose the same commands, so you never need both:
 | `composer vaults:status` | `vaults status` | Deposit status of the linked project |
 | `composer vaults:doctor` | `vaults doctor` | API, auth, DNS and edge health checks |
 | `composer vaults:connect` | `vaults connect` | Open the dashboard to connect a git provider |
-| `composer vaults:private:link` | `vaults private:link` | Create a key for this machine, wire private installs, and offer the public mirror too; `--global`, `--expires`, `--name`, `--with-public`, `--no-public` |
+| `composer vaults:private:link` | `vaults private:link` | Create a key for this machine, wire private installs, and offer a public mirror too; `--global`, `--expires`, `--name`, `--with-public`, `--global-mirror`, `--no-public` |
 | `composer vaults:private:keys` | `vaults private:keys` | List private access keys |
 | `composer vaults:private:keys:create` | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write` |
 | `composer vaults:private:keys:revoke` | `vaults private:keys:revoke` | Revoke a key |

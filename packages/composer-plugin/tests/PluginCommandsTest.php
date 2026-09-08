@@ -349,15 +349,37 @@ it('also wires the public project repository from private link when asked', func
         ->and($urls)->toContain('https://repo.vaults-edge.net/repo/projects/project-uuid');
 });
 
-it('points at deposit when the public repository is not published yet', function () {
+it('deposits automatically when the public repository is not published yet', function () {
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     queueCreatedKey($this->transport, 'vault-key-xyz');
     $this->transport->queueJson(publishedProject(false));
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 0, 'packages_deposited' => 0]], 202);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => [], 'global' => []]]);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
 
     expect($tester->execute(['--with-public' => true], ['interactive' => false]))->toBe(0)
-        ->and($tester->getDisplay())->toContain('Run "composer deposit" to publish the project repository');
+        ->and($tester->getDisplay())->toContain('Depositing this project so its repository exists');
+});
+
+it('wires the global mirror instead of the project when asked', function () {
+    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"acme/consumer\"\n}\n");
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(['data' => [
+        'global' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/global', 'canonical' => false],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+    ]]);
+
+    $tester = ($this->tester)(PrivateLinkCommand::class);
+    $exit = $tester->execute(['--global-mirror' => true]);
+
+    $composer = json_decode((string) file_get_contents($this->workDir.'/composer.json'), true);
+    $urls = array_map(fn (array $repository): string => (string) ($repository['url'] ?? ''), array_values($composer['repositories']));
+
+    expect($exit)->toBe(0)
+        ->and($tester->getDisplay())->toContain('Added the global Vaults repository')
+        ->and($urls)->toContain('https://repo.vaults-edge.net/repo/global');
 });
 
 it('skips the public repository entirely with --no-public', function () {
