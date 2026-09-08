@@ -34,7 +34,7 @@ it('suggests a valid name from composer.json or the directory', function () {
 
     expect(ProjectName::suggest($directory))->toBe('checkout-api');
 
-    file_put_contents($directory.'/composer.json', '{"name":"cranbri/Billing.Service"}');
+    file_put_contents($directory.'/composer.json', '{"name":"acme/Billing.Service"}');
 
     expect(ProjectName::suggest($directory))->toBe('billingservice');
 });

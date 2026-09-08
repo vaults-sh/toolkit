@@ -23,12 +23,12 @@ it('pings the api', function () {
 
 it('resolves the team identity', function () {
     $transport = new FakeTransport;
-    $transport->queueJson(['data' => ['team' => ['uuid' => 'team-uuid', 'name' => 'Cranbri']]]);
+    $transport->queueJson(['data' => ['team' => ['uuid' => 'team-uuid', 'name' => 'Acme']]]);
 
     $team = fakeClient($transport)->whoami();
 
     expect($team->uuid)->toBe('team-uuid')
-        ->and($team->name)->toBe('Cranbri');
+        ->and($team->name)->toBe('Acme');
 });
 
 it('creates a device code without auth', function () {

@@ -4,6 +4,9 @@
     "license": "MIT",
     "type": "composer-plugin",
     "keywords": ["vaults", "composer", "plugin", "mirror", "resilience"],
+    "archive": {
+        "exclude": ["/vendor", "/tests", "/.phpunit.cache", "/.github", "/.gitignore", "/phpunit.xml"]
+    },
     "require": {
         "php": ">=8.2",
         "composer-plugin-api": "^2.3",

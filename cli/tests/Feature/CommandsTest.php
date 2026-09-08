@@ -29,10 +29,10 @@ afterEach(function () {
 });
 
 it('logs in with a pasted token', function () {
-    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'team-uuid', 'name' => 'Cranbri']]]);
+    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'team-uuid', 'name' => 'Acme']]]);
 
     $this->artisan('login', ['--token' => 'pasted-token'])
-        ->expectsOutputToContain('Logged in to team: Cranbri')
+        ->expectsOutputToContain('Logged in to team: Acme')
         ->assertExitCode(0);
 
     expect($this->tokenStore->token())->toBe('pasted-token');
@@ -147,7 +147,7 @@ it('fails status without a manifest when non-interactive', function () {
 
 it('links interactively by creating a project when none exist', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
-    file_put_contents($this->workDir.'/composer.json', '{"name":"cranbri/my-app"}');
+    file_put_contents($this->workDir.'/composer.json', '{"name":"acme/my-app"}');
 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['data' => ['uuid' => 'new-uuid', 'name' => 'my-app']], 201);
@@ -249,7 +249,7 @@ it('fails deposit without a link when non-interactive', function () {
 });
 
 it('initialises a directory via vaults init', function () {
-    file_put_contents($this->workDir.'/composer.json', '{"name":"cranbri/fresh-app"}');
+    file_put_contents($this->workDir.'/composer.json', '{"name":"acme/fresh-app"}');
 
     $this->transport->queueJson(['data' => []]);
     $this->transport->queueJson(['data' => ['uuid' => 'fresh-uuid', 'name' => 'fresh-app']], 201);
@@ -314,7 +314,7 @@ it('reports a healthy doctor run', function () {
     $this->app->instance(EdgeProbe::class, $probe);
 
     $this->transport->queueJson(['data' => ['status' => 'ok']]);
-    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'u', 'name' => 'Cranbri']]]);
+    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'u', 'name' => 'Acme']]]);
 
     $this->artisan('doctor')
         ->expectsOutputToContain('Everything looks healthy.')
@@ -338,7 +338,7 @@ it('skips the wiring offer when the repository is already configured', function 
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', json_encode([
-        'name' => 'cranbri/my-app',
+        'name' => 'acme/my-app',
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 
@@ -381,7 +381,7 @@ it('refreshes the lock content hash to match the wired composer.json', function 
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', json_encode([
-        'name' => 'cranbri/my-app',
+        'name' => 'acme/my-app',
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 

@@ -111,7 +111,7 @@ it('logs in via the device flow when interactive and unauthenticated', function 
         'expires_in' => 900,
         'interval' => 5,
     ]], 201);
-    $this->transport->queueJson(['data' => ['status' => 'approved', 'token' => 'issued-token', 'team' => ['uuid' => 'u', 'name' => 'Cranbri']]]);
+    $this->transport->queueJson(['data' => ['status' => 'approved', 'token' => 'issued-token', 'team' => ['uuid' => 'u', 'name' => 'Acme']]]);
     $this->transport->queueJson(['data' => [
         'total' => 1,
         'deposited' => 1,
@@ -123,7 +123,7 @@ it('logs in via the device flow when interactive and unauthenticated', function 
 
     expect($exit)->toBe(0)
         ->and($this->tester->getDisplay())->toContain('ABCD-EFGH')
-        ->and($this->tester->getDisplay())->toContain('Logged in to team: Cranbri')
+        ->and($this->tester->getDisplay())->toContain('Logged in to team: Acme')
         ->and($this->tester->getDisplay())->toContain('All packages are deposited.')
         ->and($this->store->token())->toBe('issued-token');
 });
@@ -156,7 +156,7 @@ it('fails without a project link when non-interactive', function () {
 
 it('links interactively by creating a project when none exist', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
-    file_put_contents($this->workDir.'/composer.json', '{"name":"cranbri/my-app"}');
+    file_put_contents($this->workDir.'/composer.json', '{"name":"acme/my-app"}');
 
     $this->io->queue('my-app');
 
@@ -231,7 +231,7 @@ it('links interactively by selecting an existing project', function () {
 
 it('wires the repository into composer.json after an interactive deposit', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
-    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"cranbri/my-app\"\n}\n");
+    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"acme/my-app\"\n}\n");
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
 
     $this->io->queue(true);
@@ -253,7 +253,7 @@ it('wires the repository into composer.json after an interactive deposit', funct
 
     expect($exit)->toBe(0)
         ->and($this->tester->getDisplay())->toContain('composer.json updated')
-        ->and($composerJson['name'])->toBe('cranbri/my-app')
+        ->and($composerJson['name'])->toBe('acme/my-app')
         ->and($repositoryUrls)->toContain('https://repo.vaults-edge.net/repo/projects/abc');
 });
 
@@ -268,7 +268,7 @@ it('skips the wiring offer when the repository is already configured', function 
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', json_encode([
-        'name' => 'cranbri/my-app',
+        'name' => 'acme/my-app',
         'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']],
     ]));
 
@@ -291,7 +291,7 @@ it('skips the wiring offer when the repository is already configured', function 
 it('refreshes the lock content hash to match the wired composer.json', function () {
     file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
-    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"cranbri/my-app\"\n}\n");
+    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"acme/my-app\"\n}\n");
 
     $this->io->queue(true);
 

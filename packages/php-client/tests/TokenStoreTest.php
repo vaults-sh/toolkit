@@ -17,10 +17,10 @@ afterEach(function () {
 it('round trips a token and team', function () {
     $store = new TokenStore($this->path);
 
-    $store->save('secret-token', new TeamIdentity('team-uuid', 'Cranbri'));
+    $store->save('secret-token', new TeamIdentity('team-uuid', 'Acme'));
 
     expect($store->token())->toBe('secret-token')
-        ->and($store->team()?->name)->toBe('Cranbri')
+        ->and($store->team()?->name)->toBe('Acme')
         ->and(substr(sprintf('%o', fileperms($this->path)), -4))->toBe('0600');
 
     $store->clear();

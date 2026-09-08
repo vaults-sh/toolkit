@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
   contents: write
@@ -47,7 +47,7 @@ jobs:
         run: rm -rf vendor/vaults/php-client/vendor vendor/vaults/php-client/tests vendor/vaults/php-client/.git
       - name: Build PHAR
         working-directory: cli
-        run: php vaults app:build vaults --build-version=${GITHUB_REF_NAME#v} --no-interaction
+        run: php vaults app:build vaults --build-version=${GITHUB_REF_NAME} --no-interaction
       - name: Assert the client library is bundled
         working-directory: cli
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: Rewrite composer.json for publication
         working-directory: packages/composer-plugin
         run: |
-          jq 'del(.repositories) | .require["vaults/php-client"] = ">=0.1 <1.0"' composer.json > composer.json.tmp
+          jq --arg version "${GITHUB_REF_NAME}" 'del(.repositories) | .require["vaults/php-client"] = $version' composer.json > composer.json.tmp
           mv composer.json.tmp composer.json
       - uses: symplify/monorepo-split-github-action@v2.4.5
         env:

@@ -5,7 +5,7 @@
     "type": "library",
     "keywords": ["vaults", "composer", "mirror", "resilience"],
     "archive": {
-        "exclude": ["/vendor", "/tests", "/.phpunit.cache", "/.github", "/phpunit.xml", "/phpstan.neon"]
+        "exclude": ["/vendor", "/tests", "/.phpunit.cache", "/.github", "/.gitignore", "/phpunit.xml", "/phpstan.neon"]
     },
     "require": {
         "php": ">=8.2",

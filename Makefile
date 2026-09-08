@@ -26,10 +26,10 @@ release:
 	@echo "$(VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' || { echo "VERSION must be X.Y.Z (no leading v)"; exit 1; }
 	@test -z "$$(git status --porcelain)" || { echo "working tree is dirty, commit or stash first"; exit 1; }
 	@test "$$(git rev-parse --abbrev-ref HEAD)" = "main" || { echo "release from main only"; exit 1; }
-	@git rev-parse "v$(VERSION)" >/dev/null 2>&1 && { echo "tag v$(VERSION) already exists"; exit 1; } || true
+	@git rev-parse "$(VERSION)" >/dev/null 2>&1 && { echo "tag $(VERSION) already exists"; exit 1; } || true
 	@echo "==> running the full suite before tagging"
 	@$(MAKE) test
 	@git pull --ff-only origin main
-	@git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
-	@git push origin main "v$(VERSION)"
-	@echo "==> pushed tag v$(VERSION); the Release workflow builds the PHAR and splits the packages"
+	@git tag -a "$(VERSION)" -m "Release $(VERSION)"
+	@git push origin main "$(VERSION)"
+	@echo "==> pushed tag $(VERSION); the Release workflow builds the PHAR and splits the packages"
