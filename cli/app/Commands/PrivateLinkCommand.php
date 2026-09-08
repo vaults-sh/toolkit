@@ -4,23 +4,32 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Concerns\ResolvesProject;
 use LaravelZero\Framework\Commands\Command;
 use Vaults\Composer\ComposerConfigWriter;
 use Vaults\Composer\PrivateLink;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
+use Vaults\Project\ProjectManifest;
 use Vaults\VaultsClient;
+
+use function Laravel\Prompts\confirm;
 
 class PrivateLinkCommand extends Command
 {
+    use ResolvesProject;
+
     protected $signature = 'private:link
         {--global : Write the access key to your global Composer auth.json instead of this project}
         {--expires=365 : Days until the key expires (1-730)}
-        {--name= : Key name shown in team settings (defaults to this machine\'s hostname)}';
+        {--name= : Key name shown in team settings (defaults to this machine\'s hostname)}
+        {--with-public : Also add this project\'s public Vaults repository without asking}
+        {--no-public : Never offer the public Vaults repository}
+        {--project= : Project UUID for the public repository (overrides .vaults.json)}';
 
     protected $description = 'Configure this project to install your team\'s private Vaults packages';
 
-    public function handle(VaultsClient $client, ComposerConfigWriter $writer): int
+    public function handle(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest): int
     {
         $expires = (int) $this->option('expires');
 
@@ -85,6 +94,78 @@ class PrivateLinkCommand extends Command
         $this->newLine();
         $this->line('You can now run: composer require <vendor/package> for your private packages.');
 
+        $this->offerPublicMirror($client, $writer, $manifest, $directory);
+
         return self::SUCCESS;
+    }
+
+    private function offerPublicMirror(VaultsClient $client, ComposerConfigWriter $writer, ProjectManifest $manifest, string $directory): void
+    {
+        if ($this->option('no-public')) {
+            return;
+        }
+
+        $wanted = (bool) $this->option('with-public')
+            || ($this->input->isInteractive() && confirm('Also install public packages through your Vaults mirror?'));
+
+        if (! $wanted) {
+            $this->line('Run vaults deposit later to route public packages through Vaults as well.');
+
+            return;
+        }
+
+        try {
+            $projectUuid = $this->resolveProject($client, $manifest, $directory);
+            $project = $projectUuid === null ? null : $client->findProject($projectUuid);
+        } catch (VaultsException $exception) {
+            $this->error($exception->getMessage());
+
+            return;
+        }
+
+        if ($projectUuid === null) {
+            return;
+        }
+
+        if ($project === null) {
+            $this->error('Project '.$projectUuid.' was not found for your team.');
+
+            return;
+        }
+
+        if (! $project->repositoryPublished) {
+            if ($this->input->isInteractive() && confirm('This project has not been deposited yet. Deposit it now?')) {
+                $this->call('deposit');
+
+                return;
+            }
+
+            $this->line('Run vaults deposit to publish the project repository; it wires composer.json for you.');
+
+            return;
+        }
+
+        $url = $project->repositorySnippet['url'] ?? null;
+
+        if (! is_string($url) || $url === '') {
+            $this->line('Run vaults deposit to publish the project repository; it wires composer.json for you.');
+
+            return;
+        }
+
+        if ($writer->hasRepository($directory, $url)) {
+            $this->line('<fg=green>✓</> The public Vaults repository is already configured in composer.json.');
+
+            return;
+        }
+
+        if ($writer->addRepository($directory, $url)) {
+            $this->info('Added the public Vaults repository to composer.json. Commit it along with .vaults.json.');
+
+            return;
+        }
+
+        $this->error('Could not update composer.json. Add this repository manually:');
+        $this->line('  '.json_encode($project->repositorySnippet, JSON_UNESCAPED_SLASHES));
     }
 }

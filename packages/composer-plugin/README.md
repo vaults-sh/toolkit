@@ -35,8 +35,9 @@ composer vaults:connect                      # open the dashboard to connect Git
 ## Private packages
 
 ```bash
-composer vaults:private:link [--global] [--expires=365] [--name=...]
-                                             # create a key for this machine, wire composer.json and auth.json
+composer vaults:private:link [--global] [--expires=365] [--name=...] [--with-public|--no-public]
+                                             # create a key for this machine, wire composer.json and auth.json,
+                                             # and offer to add the public project repository too
 composer vaults:private:keys                 # list keys
 composer vaults:private:keys:create "GitHub Actions" [--package=vendor/name]... [--expires=365] [--write]
 composer vaults:private:keys:revoke <key-uuid>

@@ -45,7 +45,7 @@ Credentials are stored once per machine, one entry per team. Run `vaults login` 
 
 ## Private packages
 
-`vaults private:link` creates a private access key named after your machine, valid for a year, visible and revocable under Team settings. It adds the private repository to `composer.json` and the key to `auth.json`. Never commit `auth.json`. For CI or a client project, create a dedicated key with `vaults private:keys:create` and put it in `COMPOSER_AUTH` or that project's `auth.json`.
+`vaults private:link` creates a private access key named after your machine, valid for a year, visible and revocable under Team settings. It adds the private repository to `composer.json` and the key to `auth.json`, then offers to add the project's public Vaults repository as well so one command wires both; pass `--with-public` or `--no-public` to skip the question. If the project has not been deposited yet it offers to run the deposit first. Never commit `auth.json`. For CI or a client project, create a dedicated key with `vaults private:keys:create` and put it in `COMPOSER_AUTH` or that project's `auth.json`.
 
 ## Development
 

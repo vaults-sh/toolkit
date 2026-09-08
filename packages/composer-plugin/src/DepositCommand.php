@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Vaults\ComposerPlugin;
 
-use Composer\Json\JsonManipulator;
 use Composer\Package\Locker;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Vaults\ComposerPlugin\Support\ComposerJsonRepositories;
 use Vaults\ComposerPlugin\Support\ProjectLinker;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
@@ -152,7 +152,7 @@ final class DepositCommand extends VaultsCommand
             return;
         }
 
-        if ($this->repositoryAlreadyConfigured($directory, $projectRepository)) {
+        if (ComposerJsonRepositories::has($directory, $projectRepository)) {
             $output->writeln('<fg=green>✓</> The Vaults repository is already configured in composer.json.');
 
             return;
@@ -165,7 +165,7 @@ final class DepositCommand extends VaultsCommand
             $output->writeln('<fg=gray>'.$snippet.'</>');
 
             if ($this->resolveIO()->askConfirmation('Add it now? [Y/n] ')
-                && $this->wireRepository($directory, $projectRepository)
+                && ComposerJsonRepositories::add($directory, 'vaults', $projectRepository)
             ) {
                 $output->writeln('<info>composer.json updated, commit it along with .vaults.json.</info>');
 
@@ -175,56 +175,5 @@ final class DepositCommand extends VaultsCommand
 
         $output->writeln('Add this to the "repositories" section of composer.json:');
         $output->writeln($snippet);
-    }
-
-    /**
-     * @param  array<string, mixed>  $repository
-     */
-    private function repositoryAlreadyConfigured(string $directory, array $repository): bool
-    {
-        $wantedUrl = rtrim((string) ($repository['url'] ?? ''), '/');
-
-        if ($wantedUrl === '') {
-            return false;
-        }
-
-        $path = $directory.DIRECTORY_SEPARATOR.'composer.json';
-
-        if (! is_file($path)) {
-            return false;
-        }
-
-        $decoded = json_decode((string) file_get_contents($path), true);
-        $repositories = is_array($decoded) && is_array($decoded['repositories'] ?? null) ? $decoded['repositories'] : [];
-
-        foreach ($repositories as $entry) {
-            if (is_array($entry) && rtrim((string) ($entry['url'] ?? ''), '/') === $wantedUrl) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  array<string, mixed>  $repository
-     */
-    private function wireRepository(string $directory, array $repository): bool
-    {
-        $path = $directory.DIRECTORY_SEPARATOR.'composer.json';
-
-        if (! is_file($path)) {
-            return false;
-        }
-
-        $manipulator = new JsonManipulator((string) file_get_contents($path));
-
-        if (! $manipulator->addRepository('vaults', $repository, true)) {
-            return false;
-        }
-
-        file_put_contents($path, $manipulator->getContents());
-
-        return true;
     }
 }

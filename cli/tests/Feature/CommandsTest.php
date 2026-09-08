@@ -428,7 +428,7 @@ it('links a project for private hosting by creating a named key and writing it t
     ]);
     $this->transport->queueJson([], 204);
 
-    $this->artisan('private:link', ['--name' => 'tom-macbook', '--expires' => '90'])
+    $this->artisan('private:link', ['--name' => 'tom-macbook', '--expires' => '90', '--no-public' => true])
         ->expectsOutputToContain('already configured in composer.json')
         ->expectsOutputToContain('Created private access key "tom-macbook"')
         ->expectsOutputToContain('rotates it')
@@ -445,6 +445,75 @@ it('links a project for private hosting by creating a named key and writing it t
         ->and($requests[2]->method)->toBe('DELETE')
         ->and($requests[2]->url)->toEndWith('/private-keys/key-old')
         ->and($requests)->toHaveCount(3);
+});
+
+function publishedProject(bool $published): array
+{
+    return ['data' => [[
+        'uuid' => 'project-uuid',
+        'name' => 'consumer',
+        'repository' => $published ? ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/project-uuid'] : [],
+        'repository_published' => $published,
+        'deposit_percentage' => $published ? 100 : 0,
+    ]]];
+}
+
+it('also wires the public project repository from private:link when asked', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $writer = new class extends ComposerConfigWriter
+    {
+        public ?string $publicUrl = null;
+
+        public ?string $privateUrl = null;
+
+        public function addRepository(string $directory, string $url): bool
+        {
+            $this->publicUrl = $url;
+
+            return true;
+        }
+
+        public function addPrivateRepository(string $directory, string $url): bool
+        {
+            $this->privateUrl = $url;
+
+            return true;
+        }
+    };
+    $this->app->instance(ComposerConfigWriter::class, $writer);
+
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(true));
+
+    $this->artisan('private:link', ['--with-public' => true])
+        ->expectsOutputToContain('Added the public Vaults repository to composer.json')
+        ->assertExitCode(0)
+        ->run();
+
+    expect($writer->privateUrl)->toBe('https://private.vaults-edge.net')
+        ->and($writer->publicUrl)->toBe('https://repo.vaults-edge.net/repo/projects/project-uuid');
+});
+
+it('points at deposit when the public repository is not published yet', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.json', '{"repositories":[{"type":"composer","url":"https://private.vaults-edge.net","canonical":false}]}');
+
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(false));
+
+    $this->artisan('private:link', ['--with-public' => true, '--no-interaction' => true])
+        ->expectsOutputToContain('Run vaults deposit to publish the project repository')
+        ->assertExitCode(0);
+});
+
+it('skips the public repository entirely with --no-public', function () {
+    file_put_contents($this->workDir.'/composer.json', '{"repositories":[{"type":"composer","url":"https://private.vaults-edge.net","canonical":false}]}');
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+
+    $this->artisan('private:link', ['--no-public' => true])->assertExitCode(0);
+
+    expect($this->transport->requests)->toHaveCount(2);
 });
 
 it('fails private:link when not authenticated', function () {
@@ -467,7 +536,7 @@ it('writes the private key to the global composer auth.json with --global', func
 
     queueCreatedKey($this->transport, 'global-key', null);
 
-    $this->artisan('private:link', ['--global' => true])->assertExitCode(0);
+    $this->artisan('private:link', ['--global' => true, '--no-public' => true])->assertExitCode(0);
 
     $auth = json_decode((string) file_get_contents($composerHome.'/auth.json'), true);
 

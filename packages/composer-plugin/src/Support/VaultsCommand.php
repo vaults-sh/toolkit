@@ -33,6 +33,14 @@ abstract class VaultsCommand extends BaseCommand
         parent::__construct();
     }
 
+    protected function sibling(string $commandClass): VaultsCommand
+    {
+        $command = new $commandClass($this->client, $this->store, $this->workingDirectory, $this->sleeper, $this->io, $this->probe, $this->writer);
+        $command->setApplication($this->getApplication());
+
+        return $command;
+    }
+
     protected function directory(): string
     {
         return $this->workingDirectory ?? (string) getcwd();

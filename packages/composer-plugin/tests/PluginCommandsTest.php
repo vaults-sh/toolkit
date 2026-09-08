@@ -253,7 +253,7 @@ it('links private packages by creating a named key, rotating the previous one, a
     $this->transport->queueJson([], 204);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
-    $exit = $tester->execute(['--name' => 'tom-macbook', '--expires' => '90']);
+    $exit = $tester->execute(['--name' => 'tom-macbook', '--expires' => '90', '--no-public' => true]);
 
     $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
     $requests = $this->transport->requests;
@@ -275,7 +275,7 @@ it('writes the private key to the global auth.json with --global', function () {
     queueCreatedKey($this->transport, 'global-key', null);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
-    $exit = $tester->execute(['--global' => true]);
+    $exit = $tester->execute(['--global' => true, '--no-public' => true]);
 
     putenv('COMPOSER_HOME');
 
@@ -319,6 +319,54 @@ it('lists stored teams, switches the default, and logs out of one team', functio
     expect($tester->execute(['--team' => 'Globex']))->toBe(0)
         ->and($tester->getDisplay())->toContain('Logged out of Globex')
         ->and($this->store->teams())->toHaveCount(1);
+});
+
+function publishedProject(bool $published): array
+{
+    return ['data' => [[
+        'uuid' => 'project-uuid',
+        'name' => 'consumer',
+        'repository' => $published ? ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/project-uuid'] : [],
+        'repository_published' => $published,
+        'deposit_percentage' => $published ? 100 : 0,
+    ]]];
+}
+
+it('also wires the public project repository from private link when asked', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/composer.json', "{\n    \"name\": \"acme/consumer\"\n}\n");
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(true));
+
+    $tester = ($this->tester)(PrivateLinkCommand::class);
+    $exit = $tester->execute(['--with-public' => true]);
+
+    $composer = json_decode((string) file_get_contents($this->workDir.'/composer.json'), true);
+    $urls = array_map(fn (array $repository): string => (string) ($repository['url'] ?? ''), array_values($composer['repositories']));
+
+    expect($exit)->toBe(0)
+        ->and($tester->getDisplay())->toContain('Added the public Vaults repository')
+        ->and($urls)->toContain('https://repo.vaults-edge.net/repo/projects/project-uuid');
+});
+
+it('points at deposit when the public repository is not published yet', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+    $this->transport->queueJson(publishedProject(false));
+
+    $tester = ($this->tester)(PrivateLinkCommand::class);
+
+    expect($tester->execute(['--with-public' => true], ['interactive' => false]))->toBe(0)
+        ->and($tester->getDisplay())->toContain('Run "composer deposit" to publish the project repository');
+});
+
+it('skips the public repository entirely with --no-public', function () {
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+
+    $tester = ($this->tester)(PrivateLinkCommand::class);
+
+    expect($tester->execute(['--no-public' => true]))->toBe(0)
+        ->and($this->transport->requests)->toHaveCount(2);
 });
 
 it('fails private commands when not authenticated and non-interactive', function () {
