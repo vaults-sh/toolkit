@@ -1,5 +1,7 @@
 <?php
 
+putenv('VAULTS_NO_BROWSER=1');
+
 use Tests\TestCase;
 
 /*

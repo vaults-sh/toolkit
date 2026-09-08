@@ -21,6 +21,8 @@ use Vaults\VaultsClient;
 
 abstract class VaultsCommand extends BaseCommand
 {
+    public const NoBrowserVariable = 'VAULTS_NO_BROWSER';
+
     public function __construct(
         private ?VaultsClient $client = null,
         private ?TokenStore $store = null,
@@ -132,6 +134,8 @@ abstract class VaultsCommand extends BaseCommand
         $output->writeln('Then approve it at: <info>'.$pair->verificationUriComplete.'</info>');
         $output->writeln('Waiting for approval...');
 
+        $this->openBrowser($pair->verificationUriComplete);
+
         $result = $flow->await($pair);
 
         if ($result->isDenied()) {
@@ -163,6 +167,10 @@ abstract class VaultsCommand extends BaseCommand
 
     protected function openBrowser(string $url): void
     {
+        if (getenv(self::NoBrowserVariable) !== false) {
+            return;
+        }
+
         $command = match (PHP_OS_FAMILY) {
             'Darwin' => 'open',
             'Windows' => 'start',

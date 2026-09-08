@@ -89,6 +89,10 @@ class LoginCommand extends Command
 
     private function openBrowser(string $url): void
     {
+        if (getenv('VAULTS_NO_BROWSER') !== false) {
+            return;
+        }
+
         $command = match (PHP_OS_FAMILY) {
             'Darwin' => 'open',
             'Windows' => 'start',

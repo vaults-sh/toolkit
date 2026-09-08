@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Composer\Console\Application;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 use Tests\Support\FakeIO;
 use Tests\Support\FakeTransport;
@@ -441,4 +443,40 @@ it('revokes a private access key', function () {
     expect($tester->execute(['key' => 'k1']))->toBe(0)
         ->and($tester->getDisplay())->toContain('Key revoked')
         ->and($this->transport->requests[0]->method)->toBe('DELETE');
+});
+
+it('opens the approval page during device login', function () {
+    $this->store->clear();
+    $this->transport->queueJson(['data' => [
+        'device_code' => 'plain-code',
+        'user_code' => 'ABCD-EFGH',
+        'verification_uri' => 'https://vaults.test/device',
+        'verification_uri_complete' => 'https://vaults.test/device?code=ABCD-EFGH',
+        'expires_in' => 900,
+        'interval' => 5,
+    ]], 201);
+    $this->transport->queueJson(['data' => ['status' => 'approved', 'token' => 'issued-token', 'team' => ['uuid' => 'u', 'name' => 'Acme']]]);
+
+    $command = new class(new VaultsClient(null, 'https://vaults.test', $this->transport, 'https://auth.vaults.test'), $this->store, $this->workDir, new FakeSleeper, $this->io) extends VaultsCommand
+    {
+        /** @var list<string> */
+        public array $opened = [];
+
+        public function login(OutputInterface $output): ?string
+        {
+            return $this->deviceLogin($output);
+        }
+
+        protected function openBrowser(string $url): void
+        {
+            $this->opened[] = $url;
+        }
+    };
+
+    $output = new BufferedOutput;
+    $token = $command->login($output);
+
+    expect($token)->toBe('issued-token')
+        ->and($command->opened)->toBe(['https://vaults.test/device?code=ABCD-EFGH'])
+        ->and($output->fetch())->toContain('ABCD-EFGH');
 });

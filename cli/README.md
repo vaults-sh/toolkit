@@ -39,6 +39,8 @@ Every command also checks for a newer release at most once a day and prints a on
 
 No UUIDs needed: any command that requires a project will walk you through picking or creating one by name, then remembers it, and its team, in a committed `.vaults.json`. CI authenticates with the `VAULTS_TOKEN` environment variable and uses `--project=<uuid>` or the committed manifest.
 
+Both `vaults login` and `vaults connect` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
+
 ## Working with several teams
 
 Credentials are stored once per machine, one entry per team. Run `vaults login` for each team you work with, and each project picks its team from `.vaults.json`, so switching clients is just changing directory. `vaults teams` shows what is stored and which team applies in the current directory; `vaults teams --use=<team>` sets the default for directories without a manifest.
