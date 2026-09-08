@@ -13,6 +13,7 @@ use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 use Throwable;
+use Vaults\Auth\CredentialResolver;
 use Vaults\Auth\TokenStore;
 use Vaults\Project\ProjectManifest;
 use Vaults\VaultsClient;
@@ -63,12 +64,14 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
             return;
         }
 
-        $token = $this->tokenStore()->token();
+        $credentials = (new CredentialResolver($this->tokenStore()))->resolve($directory);
         $projectUuid = (new ProjectManifest)->load($directory);
 
-        if ($token === null || $projectUuid === null) {
+        if ($credentials === null || $projectUuid === null) {
             return;
         }
+
+        $token = $credentials->token;
 
         $lockPath = $directory.DIRECTORY_SEPARATOR.'composer.lock';
 

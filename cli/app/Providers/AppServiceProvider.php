@@ -11,6 +11,7 @@ use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use LaravelZero\Framework\Providers\Build\Build;
+use Vaults\Auth\CredentialResolver;
 use Vaults\Auth\DeviceFlow;
 use Vaults\Auth\TokenStore;
 use Vaults\Support\Clock;
@@ -42,8 +43,12 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(TokenStore::class, fn (): TokenStore => new TokenStore);
 
+        $this->app->bind(CredentialResolver::class, fn (): CredentialResolver => new CredentialResolver($this->app->make(TokenStore::class)));
+
         $this->app->bind(VaultsClient::class, function (): VaultsClient {
-            return new VaultsClient($this->app->make(TokenStore::class)->token());
+            $credentials = $this->app->make(CredentialResolver::class)->resolve((string) getcwd());
+
+            return new VaultsClient($credentials?->token);
         });
 
         $this->app->bind(Sleeper::class, LaravelSleeper::class);

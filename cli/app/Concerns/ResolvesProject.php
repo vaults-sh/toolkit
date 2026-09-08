@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
+use Vaults\Auth\TokenStore;
 use Vaults\Exception\ApiException;
 use Vaults\Project\ProjectManifest;
 use Vaults\Project\ProjectName;
@@ -20,10 +21,11 @@ trait ResolvesProject
     private function resolveProject(VaultsClient $client, ProjectManifest $manifest, string $directory): ?string
     {
         $override = $this->option('project');
+        $teamUuid = app(TokenStore::class)->team()?->uuid;
 
         if (is_string($override) && $override !== '') {
             if ($manifest->load($directory) !== $override) {
-                $manifest->write($directory, $override);
+                $manifest->write($directory, $override, $teamUuid);
                 $this->info('Linked this directory to project '.$override.' (.vaults.json written, commit it).');
             }
 
@@ -48,7 +50,7 @@ trait ResolvesProject
             ? $this->createProject($client, $directory)
             : $this->chooseProject($client, $projects, $directory);
 
-        $manifest->write($directory, $project->uuid);
+        $manifest->write($directory, $project->uuid, $teamUuid);
         $this->info('Linked this directory to "'.$project->name.'" (.vaults.json written, commit it).');
 
         return $project->uuid;

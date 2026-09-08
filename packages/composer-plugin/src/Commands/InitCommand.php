@@ -40,7 +40,7 @@ final class InitCommand extends VaultsCommand
         }
 
         try {
-            $projectUuid = (new ProjectLinker($client, $manifest, $this->resolveIO(), $output))
+            $projectUuid = (new ProjectLinker($client, $manifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
                 ->resolve($directory, is_string($override) ? $override : null, $input->isInteractive());
         } catch (VaultsException $exception) {
             return $this->reportFailure($exception, $output);

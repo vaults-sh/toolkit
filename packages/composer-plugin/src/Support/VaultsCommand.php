@@ -7,12 +7,14 @@ namespace Vaults\ComposerPlugin\Support;
 use Composer\Command\BaseCommand;
 use Composer\IO\IOInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Vaults\Auth\CredentialResolver;
 use Vaults\Auth\DeviceFlow;
 use Vaults\Auth\TokenStore;
 use Vaults\Composer\ComposerConfigWriter;
 use Vaults\Diagnostics\EdgeProbe;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
+use Vaults\Result\TeamIdentity;
 use Vaults\Support\NativeSleeper;
 use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
@@ -66,21 +68,44 @@ abstract class VaultsCommand extends BaseCommand
         return $this->io ?? $this->getIO();
     }
 
+    protected ?TeamIdentity $activeTeam = null;
+
+    protected function resolver(): CredentialResolver
+    {
+        return new CredentialResolver($this->store());
+    }
+
     protected function authenticatedClient(OutputInterface $output, bool $interactive): ?VaultsClient
     {
-        $token = $this->store()->token();
+        $credentials = $this->resolver()->resolve($this->directory());
 
-        if ($token === null && $interactive) {
+        if ($credentials === null && $interactive) {
+            $missing = $this->resolver()->missingTeam($this->directory());
+
+            if ($missing !== null) {
+                $output->writeln('This project belongs to team '.$missing.', which is not stored on this machine yet.');
+            }
+
             $token = $this->deviceLogin($output);
+            $credentials = $token === null ? null : $this->resolver()->resolve($this->directory());
+
+            if ($token !== null && $credentials === null) {
+                $output->writeln('<error>The team you logged in to is not the team recorded in .vaults.json ('.$missing.'). Log in to that team, or remove the team line from .vaults.json.</error>');
+            }
         }
 
-        if ($token === null) {
-            $output->writeln('<error>Not authenticated. Run "composer vaults:login" in an interactive terminal, or set the VAULTS_TOKEN environment variable.</error>');
+        if ($credentials === null) {
+            $missing = $this->resolver()->missingTeam($this->directory());
+            $output->writeln($missing !== null
+                ? '<error>Not authenticated for team '.$missing.'. Run "composer vaults:login" in an interactive terminal and approve it for that team, or set the VAULTS_TOKEN environment variable.</error>'
+                : '<error>Not authenticated. Run "composer vaults:login" in an interactive terminal, or set the VAULTS_TOKEN environment variable.</error>');
 
             return null;
         }
 
-        return $this->client()->withToken($token);
+        $this->activeTeam = $credentials->team;
+
+        return $this->client()->withToken($credentials->token);
     }
 
     protected function deviceLogin(OutputInterface $output): ?string

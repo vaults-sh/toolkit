@@ -404,27 +404,47 @@ it('refreshes the lock content hash to match the wired composer.json', function 
         ->not->toContain('dead');
 });
 
-it('links a project for private hosting and writes the bearer token to auth.json', function () {
+function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-09-08T00:00:00Z', array $existing = []): void
+{
+    $transport->queueJson([
+        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => $expiresAt],
+        'token' => $token,
+        'host' => 'private.vaults-edge.net',
+        'repository_url' => 'https://private.vaults-edge.net',
+    ], 201);
+    $transport->queueJson(['data' => $existing]);
+}
+
+it('links a project for private hosting by creating a named key and writing it to auth.json', function () {
     file_put_contents($this->workDir.'/composer.json', json_encode([
         'repositories' => [
             ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
         ],
     ], JSON_PRETTY_PRINT));
 
-    $this->transport->queueJson(['data' => [
-        'token' => 'vault-token-xyz',
-        'host' => 'private.vaults-edge.net',
-        'repository_url' => 'https://private.vaults-edge.net',
-        'expires_at' => time() + 604800,
-    ]]);
+    queueCreatedKey($this->transport, 'vault-key-xyz', existing: [
+        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => null],
+        ['uuid' => 'key-ci', 'name' => 'GitHub Actions', 'project' => null, 'packages' => null, 'expires_at' => null],
+    ]);
+    $this->transport->queueJson([], 204);
 
-    $this->artisan('private:link')
+    $this->artisan('private:link', ['--name' => 'tom-macbook', '--expires' => '90'])
         ->expectsOutputToContain('already configured in composer.json')
-        ->assertExitCode(0);
+        ->expectsOutputToContain('Created private access key "tom-macbook"')
+        ->expectsOutputToContain('rotates it')
+        ->assertExitCode(0)
+        ->run();
 
     $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+    $requests = $this->transport->requests;
 
-    expect($auth['bearer']['private.vaults-edge.net'])->toBe('vault-token-xyz');
+    expect($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
+        ->and($requests[0]->method)->toBe('POST')
+        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90])
+        ->and($requests[1]->method)->toBe('GET')
+        ->and($requests[2]->method)->toBe('DELETE')
+        ->and($requests[2]->url)->toEndWith('/private-keys/key-old')
+        ->and($requests)->toHaveCount(3);
 });
 
 it('fails private:link when not authenticated', function () {
@@ -435,7 +455,7 @@ it('fails private:link when not authenticated', function () {
         ->assertExitCode(1);
 });
 
-it('writes the private token to the global composer auth.json with --global', function () {
+it('writes the private key to the global composer auth.json with --global', function () {
     $composerHome = $this->workDir.'/composer-home';
     putenv('COMPOSER_HOME='.$composerHome);
 
@@ -445,20 +465,63 @@ it('writes the private token to the global composer auth.json with --global', fu
         ],
     ], JSON_PRETTY_PRINT));
 
-    $this->transport->queueJson(['data' => [
-        'token' => 'global-token',
-        'host' => 'private.vaults-edge.net',
-        'repository_url' => 'https://private.vaults-edge.net',
-        'expires_at' => null,
-    ]]);
+    queueCreatedKey($this->transport, 'global-key', null);
 
     $this->artisan('private:link', ['--global' => true])->assertExitCode(0);
 
     $auth = json_decode((string) file_get_contents($composerHome.'/auth.json'), true);
 
-    expect($auth['bearer']['private.vaults-edge.net'])->toBe('global-token');
+    expect($auth['bearer']['private.vaults-edge.net'])->toBe('global-key');
 
     putenv('COMPOSER_HOME');
+});
+
+it('rejects an out-of-range expiry on private:link before calling the api', function () {
+    $this->artisan('private:link', ['--expires' => '0'])->assertExitCode(1);
+
+    expect($this->transport->requests)->toBe([]);
+});
+
+it('stores a team per login, lists them, and logs out of one at a time', function () {
+    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'acme-uuid', 'name' => 'Acme']]]);
+    $this->artisan('login', ['--token' => 'acme-token'])->assertExitCode(0);
+
+    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'globex-uuid', 'name' => 'Globex']]]);
+    $this->artisan('login', ['--token' => 'globex-token'])
+        ->expectsOutputToContain('This machine now holds 2 teams')
+        ->assertExitCode(0);
+
+    file_put_contents($this->workDir.'/.vaults.json', json_encode(['project' => 'p', 'team' => 'acme-uuid']));
+
+    $this->artisan('teams')
+        ->expectsOutputToContain('yes (.vaults.json)')
+        ->expectsOutputToContain('Globex')
+        ->assertExitCode(0);
+
+    $this->artisan('teams', ['--use' => 'Acme'])
+        ->expectsOutputToContain('Acme is now the default team.')
+        ->assertExitCode(0);
+
+    expect($this->tokenStore->token())->toBe('acme-token');
+
+    $this->artisan('logout', ['--team' => 'Globex'])
+        ->expectsOutputToContain('Logged out of Globex')
+        ->assertExitCode(0);
+
+    expect($this->tokenStore->teams())->toHaveCount(1);
+
+    $this->artisan('logout', ['--all' => true])->assertExitCode(0);
+
+    expect($this->tokenStore->token())->toBeNull();
+});
+
+it('records the team in the manifest when linking a project', function () {
+    $this->transport->queueJson(['data' => ['team' => ['uuid' => 'acme-uuid', 'name' => 'Acme']]]);
+    $this->artisan('login', ['--token' => 'acme-token'])->assertExitCode(0);
+
+    $this->artisan('init', ['--project' => 'project-uuid'])->assertExitCode(0);
+
+    expect(json_decode((string) file_get_contents($this->workDir.'/.vaults.json'), true))->toBe(['project' => 'project-uuid', 'team' => 'acme-uuid']);
 });
 
 it('opens the dashboard for the connect command', function () {

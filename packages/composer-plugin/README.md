@@ -23,8 +23,9 @@ Everything is built in: run `composer deposit` in a terminal and it walks you th
 ## All commands
 
 ```bash
-composer vaults:login [--token=...]          # device login, or store a team API token
-composer vaults:logout
+composer vaults:login [--token=...]          # device login, once per team; or store a team API token
+composer vaults:logout [--team=...|--all]
+composer vaults:teams [--use=...]            # teams stored on this machine, and which applies here
 composer vaults:init [--project=<uuid>]      # link this directory without depositing
 composer vaults:status [--project=<uuid>]
 composer vaults:doctor                       # API, auth, DNS and edge health
@@ -34,13 +35,16 @@ composer vaults:connect                      # open the dashboard to connect Git
 ## Private packages
 
 ```bash
-composer vaults:private:link [--global]      # add the private repository and write a bearer token to auth.json
+composer vaults:private:link [--global] [--expires=365] [--name=...]
+                                             # create a key for this machine, wire composer.json and auth.json
 composer vaults:private:keys                 # list keys
 composer vaults:private:keys:create "GitHub Actions" [--package=vendor/name]... [--expires=365] [--write]
 composer vaults:private:keys:revoke <key-uuid>
 ```
 
-`private:link` issues a short-lived token for your own machine. For CI or a client project, create a named key and put it in `COMPOSER_AUTH` or the consuming project's `auth.json`. Never commit `auth.json`.
+`private:link` creates a revocable key named after your machine, valid for a year by default; re-running it rotates the key. For CI or a client project, create a dedicated key with `private:keys:create` and put it in `COMPOSER_AUTH` or the consuming project's `auth.json`. Never commit `auth.json`.
+
+Credentials are stored once per machine with one entry per team. Log in once per team you work with; each project's committed `.vaults.json` records its team, so every command in that directory uses the right one automatically.
 
 ## Automatic deposits after `composer update`
 

@@ -15,5 +15,11 @@ it('round trips the project uuid', function () {
     $manifest->write($directory, 'project-uuid');
 
     expect($manifest->load($directory))->toBe('project-uuid')
+        ->and($manifest->team($directory))->toBeNull()
         ->and(json_decode((string) file_get_contents($directory.'/.vaults.json'), true))->toBe(['project' => 'project-uuid']);
+
+    $manifest->write($directory, 'project-uuid', 'team-uuid');
+
+    expect($manifest->team($directory))->toBe('team-uuid')
+        ->and(json_decode((string) file_get_contents($directory.'/.vaults.json'), true))->toBe(['project' => 'project-uuid', 'team' => 'team-uuid']);
 });

@@ -19,13 +19,14 @@ final readonly class ProjectLinker
         private ProjectManifest $manifest,
         private IOInterface $io,
         private OutputInterface $output,
+        private ?string $teamUuid = null,
     ) {}
 
     public function resolve(string $directory, ?string $override, bool $interactive): ?string
     {
         if (is_string($override) && $override !== '') {
             if ($this->manifest->load($directory) !== $override) {
-                $this->manifest->write($directory, $override);
+                $this->manifest->write($directory, $override, $this->teamUuid);
                 $this->output->writeln('Linked this directory to project '.$override.' (.vaults.json written, commit it).');
             }
 
@@ -70,7 +71,7 @@ final readonly class ProjectLinker
             $project = $this->createProject($directory);
         }
 
-        $this->manifest->write($directory, $project->uuid);
+        $this->manifest->write($directory, $project->uuid, $this->teamUuid);
         $this->output->writeln('Linked this directory to "'.$project->name.'" (.vaults.json written, commit it).');
 
         return $project->uuid;

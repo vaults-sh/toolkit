@@ -18,12 +18,13 @@ final readonly class PrivateKey
         public ?string $createdAt,
         public ?string $token = null,
         public ?string $host = null,
+        public ?string $repositoryUrl = null,
     ) {}
 
     /**
      * @param  array<string, mixed>  $data
      */
-    public static function fromArray(array $data, ?string $token = null, ?string $host = null): self
+    public static function fromArray(array $data, ?string $token = null, ?string $host = null, ?string $repositoryUrl = null): self
     {
         $project = is_array($data['project'] ?? null) ? $data['project'] : null;
         $packages = is_array($data['packages'] ?? null)
@@ -39,6 +40,7 @@ final readonly class PrivateKey
             is_string($data['created_at'] ?? null) ? $data['created_at'] : null,
             $token,
             $host,
+            $repositoryUrl,
         );
     }
 

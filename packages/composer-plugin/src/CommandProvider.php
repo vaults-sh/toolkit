@@ -16,6 +16,7 @@ use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
 use Vaults\ComposerPlugin\Commands\PrivateLinkCommand;
 use Vaults\ComposerPlugin\Commands\StatusCommand;
+use Vaults\ComposerPlugin\Commands\TeamsCommand;
 
 final class CommandProvider implements CommandProviderCapability
 {
@@ -28,6 +29,7 @@ final class CommandProvider implements CommandProviderCapability
             new DepositCommand,
             new LoginCommand,
             new LogoutCommand,
+            new TeamsCommand,
             new InitCommand,
             new StatusCommand,
             new DoctorCommand,

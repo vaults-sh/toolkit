@@ -31,7 +31,11 @@ vaults deposit
 ```
 
 Both authenticate with a browser device login and walk you through picking or creating a project, so
-there are no UUIDs to copy and no dashboard to open. Once a project is deposited, `composer install`
+there are no UUIDs to copy and no dashboard to open.
+
+Credentials live once per machine in `~/.config/vaults/config.json`, like SSH keys. Log in once per
+team you work with; each project's committed `.vaults.json` records its team, so a contractor moving
+between clients never switches accounts by hand. `VAULTS_TOKEN` overrides everything for CI. Once a project is deposited, `composer install`
 runs entirely from the Vaults edge, and neither tool is needed at install time.
 
 The plugin and the CLI expose the same commands, so you never need both:
@@ -40,12 +44,13 @@ The plugin and the CLI expose the same commands, so you never need both:
 | --- | --- | --- |
 | `composer deposit` / `composer vaults:deposit` | `vaults deposit` | Deposit `composer.lock`; `--check`, `--write`, `--project=` |
 | `composer vaults:login` | `vaults login` | Browser device login, or `--token=` |
-| `composer vaults:logout` | `vaults logout` | Forget stored credentials |
+| `composer vaults:logout` | `vaults logout` | Forget the current team, `--team=`, or `--all` |
+| `composer vaults:teams` | `vaults teams` | List stored teams; `--use=` picks the default |
 | `composer vaults:init` | `vaults init` | Link the directory to a project without depositing |
 | `composer vaults:status` | `vaults status` | Deposit status of the linked project |
 | `composer vaults:doctor` | `vaults doctor` | API, auth, DNS and edge health checks |
 | `composer vaults:connect` | `vaults connect` | Open the dashboard to connect a git provider |
-| `composer vaults:private:link` | `vaults private:link` | Install your team's private packages; `--global` |
+| `composer vaults:private:link` | `vaults private:link` | Create a key for this machine and wire private installs; `--global`, `--expires`, `--name` |
 | `composer vaults:private:keys` | `vaults private:keys` | List private access keys |
 | `composer vaults:private:keys:create` | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write` |
 | `composer vaults:private:keys:revoke` | `vaults private:keys:revoke` | Revoke a key |

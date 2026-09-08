@@ -33,7 +33,7 @@ final class StatusCommand extends VaultsCommand
         $override = $input->getOption('project');
 
         try {
-            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output))
+            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
                 ->resolve($this->directory(), is_string($override) ? $override : null, $input->isInteractive());
 
             if ($projectUuid === null) {

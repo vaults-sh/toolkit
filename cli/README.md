@@ -22,21 +22,30 @@ Every command also checks for a newer release at most once a day and prints a on
 
 | Command | Purpose |
 |---|---|
-| `vaults login` | Device login: shows a code, opens the browser, waits for approval. `--token=` for CI. |
+| `vaults login` | Device login: shows a code, opens the browser, waits for approval. Run once per team; `--token=` for CI. |
+| `vaults teams` | List the teams stored on this machine and which applies here; `--use=` sets the default. |
 | `vaults init` | Link this directory to a Vaults project (pick one or create by name) without depositing anything. |
 | `vaults deposit` | Deposits everything in `composer.lock`; offers to wire composer.json; `--write` applies the rewritten lock. |
 | `vaults deposit --check` | Read-only deposit report; exit code 1 if anything is undeposited (CI-friendly). |
 | `vaults status` | Deposit status of the project in the current directory. |
 | `vaults doctor` | Connectivity diagnosis: API, auth, DNS, and edge health. |
 | `vaults connect` | Open the dashboard to connect GitHub, GitLab or Bitbucket and choose repositories to host. |
-| `vaults private:link` | Add the private repository and write a bearer token to `auth.json` (`--global` for your user). |
+| `vaults private:link` | Create a revocable key named after this machine (one year by default, `--expires`, `--name`) and wire `composer.json` plus `auth.json`; re-running rotates it. `--global` writes your user's `auth.json`. |
 | `vaults private:keys` | List private access keys. |
 | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write`. |
 | `vaults private:keys:revoke` | Revoke a key. |
 | `vaults self-update` | Replace the running PHAR with the latest release. |
-| `vaults logout` | Remove stored credentials. |
+| `vaults logout` | Forget the current team, `--team=<uuid or name>`, or `--all`. |
 
-No UUIDs needed: any command that requires a project will walk you through picking or creating one by name, then remembers it in a committed `.vaults.json`. CI authenticates with the `VAULTS_TOKEN` environment variable and uses `--project=<uuid>` or the committed manifest.
+No UUIDs needed: any command that requires a project will walk you through picking or creating one by name, then remembers it, and its team, in a committed `.vaults.json`. CI authenticates with the `VAULTS_TOKEN` environment variable and uses `--project=<uuid>` or the committed manifest.
+
+## Working with several teams
+
+Credentials are stored once per machine, one entry per team. Run `vaults login` for each team you work with, and each project picks its team from `.vaults.json`, so switching clients is just changing directory. `vaults teams` shows what is stored and which team applies in the current directory; `vaults teams --use=<team>` sets the default for directories without a manifest.
+
+## Private packages
+
+`vaults private:link` creates a private access key named after your machine, valid for a year, visible and revocable under Team settings. It adds the private repository to `composer.json` and the key to `auth.json`. Never commit `auth.json`. For CI or a client project, create a dedicated key with `vaults private:keys:create` and put it in `COMPOSER_AUTH` or that project's `auth.json`.
 
 ## Development
 

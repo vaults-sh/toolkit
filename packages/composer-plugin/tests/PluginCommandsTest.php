@@ -18,9 +18,11 @@ use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
 use Vaults\ComposerPlugin\Commands\PrivateLinkCommand;
 use Vaults\ComposerPlugin\Commands\StatusCommand;
+use Vaults\ComposerPlugin\Commands\TeamsCommand;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\ComposerPlugin\VaultsPlugin;
 use Vaults\Diagnostics\EdgeProbe;
+use Vaults\Result\TeamIdentity;
 use Vaults\Support\FakeSleeper;
 use Vaults\VaultsClient;
 
@@ -88,6 +90,7 @@ it('registers every command under the vaults namespace with deposit kept as an a
         'vaults:deposit',
         'vaults:login',
         'vaults:logout',
+        'vaults:teams',
         'vaults:init',
         'vaults:status',
         'vaults:doctor',
@@ -231,34 +234,45 @@ it('points the connect command at the dashboard', function () {
         ->and($tester->getDisplay())->toContain('composer vaults:private:link');
 });
 
-it('links private packages by adding the repository and writing the bearer token', function () {
-    $this->transport->queueJson(['data' => [
-        'token' => 'vault-token-xyz',
+function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-09-08T00:00:00Z', array $existing = []): void
+{
+    $transport->queueJson([
+        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => $expiresAt, 'created_at' => null],
+        'token' => $token,
         'host' => 'private.vaults-edge.net',
         'repository_url' => 'https://private.vaults-edge.net',
-        'expires_at' => time() + 604800,
-    ]]);
+    ], 201);
+    $transport->queueJson(['data' => $existing]);
+}
+
+it('links private packages by creating a named key, rotating the previous one, and writing auth.json', function () {
+    queueCreatedKey($this->transport, 'vault-key-xyz', existing: [
+        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => null, 'created_at' => null],
+        ['uuid' => 'key-ci', 'name' => 'GitHub Actions', 'project' => null, 'packages' => null, 'expires_at' => null, 'created_at' => null],
+    ]);
+    $this->transport->queueJson([], 204);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
-    $exit = $tester->execute([]);
+    $exit = $tester->execute(['--name' => 'tom-macbook', '--expires' => '90']);
 
     $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+    $requests = $this->transport->requests;
 
     expect($exit)->toBe(0)
         ->and($this->writer->privateUrl)->toBe('https://private.vaults-edge.net')
-        ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-token-xyz')
-        ->and($tester->getDisplay())->toContain('Do not commit auth.json');
+        ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
+        ->and($tester->getDisplay())->toContain('Created private access key "tom-macbook"')
+        ->and($tester->getDisplay())->toContain('Do not commit auth.json')
+        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90])
+        ->and($requests[2]->method)->toBe('DELETE')
+        ->and($requests[2]->url)->toEndWith('/private-keys/key-old')
+        ->and($requests)->toHaveCount(3);
 });
 
-it('writes the private token to the global auth.json with --global', function () {
+it('writes the private key to the global auth.json with --global', function () {
     $composerHome = $this->workDir.'/composer-home';
     putenv('COMPOSER_HOME='.$composerHome);
-    $this->transport->queueJson(['data' => [
-        'token' => 'global-token',
-        'host' => 'private.vaults-edge.net',
-        'repository_url' => 'https://private.vaults-edge.net',
-        'expires_at' => null,
-    ]]);
+    queueCreatedKey($this->transport, 'global-key', null);
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
     $exit = $tester->execute(['--global' => true]);
@@ -266,7 +280,45 @@ it('writes the private token to the global auth.json with --global', function ()
     putenv('COMPOSER_HOME');
 
     expect($exit)->toBe(0)
-        ->and(json_decode((string) file_get_contents($composerHome.'/auth.json'), true)['bearer']['private.vaults-edge.net'])->toBe('global-token');
+        ->and(json_decode((string) file_get_contents($composerHome.'/auth.json'), true)['bearer']['private.vaults-edge.net'])->toBe('global-key');
+});
+
+it('uses the team recorded in the manifest and explains when it is missing', function () {
+    $this->store->clear();
+    $this->store->save('acme-token', new TeamIdentity('acme-uuid', 'Acme'));
+    $this->store->save('globex-token', new TeamIdentity('globex-uuid', 'Globex'));
+    file_put_contents($this->workDir.'/.vaults.json', json_encode(['project' => 'project-uuid', 'team' => 'acme-uuid']));
+    $this->transport->queueJson(['data' => []]);
+
+    $tester = ($this->tester)(PrivateKeysCommand::class);
+
+    expect($tester->execute([]))->toBe(0)
+        ->and($this->transport->requests[0]->headers['Authorization'] ?? null)->toBe('Bearer acme-token');
+
+    $this->store->forget('acme-uuid');
+
+    $tester = ($this->tester)(PrivateKeysCommand::class);
+
+    expect($tester->execute([], ['interactive' => false]))->toBe(1)
+        ->and($tester->getDisplay())->toContain('Not authenticated for team acme-uuid');
+});
+
+it('lists stored teams, switches the default, and logs out of one team', function () {
+    $this->store->clear();
+    $this->store->save('acme-token', new TeamIdentity('acme-uuid', 'Acme'));
+    $this->store->save('globex-token', new TeamIdentity('globex-uuid', 'Globex'));
+
+    $tester = ($this->tester)(TeamsCommand::class);
+
+    expect($tester->execute(['--use' => 'acme']))->toBe(0)
+        ->and($tester->getDisplay())->toContain('Acme is now the default team.')
+        ->and($this->store->token())->toBe('acme-token');
+
+    $tester = ($this->tester)(LogoutCommand::class);
+
+    expect($tester->execute(['--team' => 'Globex']))->toBe(0)
+        ->and($tester->getDisplay())->toContain('Logged out of Globex')
+        ->and($this->store->teams())->toHaveCount(1);
 });
 
 it('fails private commands when not authenticated and non-interactive', function () {

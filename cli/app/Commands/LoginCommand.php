@@ -14,7 +14,7 @@ class LoginCommand extends Command
 {
     protected $signature = 'login {--token= : Authenticate with an existing team API token}';
 
-    protected $description = 'Authenticate the CLI with your Vaults team';
+    protected $description = 'Add a Vaults team to this machine (run once per team you work with)';
 
     public function handle(VaultsClient $client, TokenStore $store, DeviceFlow $flow): int
     {
@@ -57,6 +57,7 @@ class LoginCommand extends Command
         $store->save($result->token, $result->team);
 
         $this->info('Logged in to team: '.($result->team?->name ?? 'unknown'));
+        $this->explainTeams($store);
 
         return self::SUCCESS;
     }
@@ -74,8 +75,16 @@ class LoginCommand extends Command
         $store->save($token, $team);
 
         $this->info('Logged in to team: '.($team->name ?? 'unknown'));
+        $this->explainTeams($store);
 
         return self::SUCCESS;
+    }
+
+    private function explainTeams(TokenStore $store): void
+    {
+        if (count($store->teams()) > 1) {
+            $this->line('This machine now holds '.count($store->teams()).' teams. Projects use the team recorded in .vaults.json; run vaults teams to see them.');
+        }
     }
 
     private function openBrowser(string $url): void

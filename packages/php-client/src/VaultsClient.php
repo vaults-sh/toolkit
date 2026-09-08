@@ -11,7 +11,6 @@ use Vaults\Result\DepositRun;
 use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
 use Vaults\Result\PrivateKey;
-use Vaults\Result\PrivateToken;
 use Vaults\Result\Project;
 use Vaults\Result\RewrittenLock;
 use Vaults\Result\TeamIdentity;
@@ -123,11 +122,6 @@ final class VaultsClient
         return Project::fromArray($this->request('POST', '/api/v1/projects', $payload));
     }
 
-    public function createPrivateToken(): PrivateToken
-    {
-        return PrivateToken::fromArray($this->request('POST', '/api/v1/private-token'));
-    }
-
     /**
      * @return list<PrivateKey>
      */
@@ -166,6 +160,7 @@ final class VaultsClient
             $data,
             is_string($body['token'] ?? null) ? $body['token'] : null,
             is_string($body['host'] ?? null) ? $body['host'] : null,
+            is_string($body['repository_url'] ?? null) ? $body['repository_url'] : null,
         );
     }
 
