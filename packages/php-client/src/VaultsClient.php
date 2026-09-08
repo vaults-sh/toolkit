@@ -101,6 +101,17 @@ final class VaultsClient
         ));
     }
 
+    public function findProject(string $projectUuid): ?Project
+    {
+        foreach ($this->listProjects() as $project) {
+            if ($project->uuid === $projectUuid) {
+                return $project;
+            }
+        }
+
+        return null;
+    }
+
     public function createProject(string $name, ?string $description = null, ?string $repositoryUrl = null): Project
     {
         $payload = array_filter([
@@ -143,7 +154,7 @@ final class VaultsClient
         }
 
         if ($packages !== []) {
-            $payload['packages'] = array_values($packages);
+            $payload['packages'] = $packages;
         }
 
         $response = $this->send('POST', '/api/v1/private-keys', $payload);

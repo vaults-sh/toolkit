@@ -4,12 +4,19 @@ The command-line client for [Vaults](https://vaults.sh), the resilient Composer 
 
 ## Install
 
-Download the latest `vaults` PHAR from the [vaults-sh/toolkit Releases](https://github.com/vaults-sh/toolkit/releases) page, then:
+```bash
+curl -fsSL https://vaults.sh/install.sh | sh
+```
+
+The installer downloads the latest `vaults` PHAR from the [vaults-sh/toolkit Releases](https://github.com/vaults-sh/toolkit/releases), verifies its checksum, and puts it on your path. To do it by hand, download `vaults` from the release page, `chmod +x vaults`, and move it to `/usr/local/bin/vaults`.
+
+## Staying up to date
 
 ```bash
-chmod +x vaults
-mv vaults /usr/local/bin/vaults
+vaults self-update
 ```
+
+Every command also checks for a newer release at most once a day and prints a one-line notice when one exists. It never blocks, never slows a command by more than two seconds, and can be silenced with `VAULTS_NO_UPDATE_CHECK=1`.
 
 ## Commands
 
@@ -21,6 +28,12 @@ mv vaults /usr/local/bin/vaults
 | `vaults deposit --check` | Read-only deposit report; exit code 1 if anything is undeposited (CI-friendly). |
 | `vaults status` | Deposit status of the project in the current directory. |
 | `vaults doctor` | Connectivity diagnosis: API, auth, DNS, and edge health. |
+| `vaults connect` | Open the dashboard to connect GitHub, GitLab or Bitbucket and choose repositories to host. |
+| `vaults private:link` | Add the private repository and write a bearer token to `auth.json` (`--global` for your user). |
+| `vaults private:keys` | List private access keys. |
+| `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write`. |
+| `vaults private:keys:revoke` | Revoke a key. |
+| `vaults self-update` | Replace the running PHAR with the latest release. |
 | `vaults logout` | Remove stored credentials. |
 
 No UUIDs needed: any command that requires a project will walk you through picking or creating one by name, then remembers it in a committed `.vaults.json`. CI authenticates with the `VAULTS_TOKEN` environment variable and uses `--project=<uuid>` or the committed manifest.

@@ -4,45 +4,23 @@ declare(strict_types=1);
 
 namespace Vaults\ComposerPlugin;
 
-use Composer\Command\BaseCommand;
-use Composer\IO\IOInterface;
 use Composer\Json\JsonManipulator;
 use Composer\Package\Locker;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Vaults\Auth\DeviceFlow;
-use Vaults\Auth\TokenStore;
-use Vaults\Exception\ApiException;
-use Vaults\Exception\AuthenticationException;
+use Vaults\ComposerPlugin\Support\ProjectLinker;
+use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
-use Vaults\Project\ProjectName;
-use Vaults\Result\Project;
-use Vaults\Support\NativeSleeper;
-use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
 
-final class DepositCommand extends BaseCommand
+final class DepositCommand extends VaultsCommand
 {
-    public function __construct(
-        private ?VaultsClient $client = null,
-        private ?TokenStore $store = null,
-        private ?string $workingDirectory = null,
-        private ?Sleeper $sleeper = null,
-        private ?IOInterface $io = null,
-    ) {
-        parent::__construct();
-    }
-
-    private function resolveIO(): IOInterface
-    {
-        return $this->io ?? $this->getIO();
-    }
-
     protected function configure(): void
     {
-        $this->setName('deposit')
+        $this->setName('vaults:deposit')
+            ->setAliases(['deposit'])
             ->setDescription('Deposit the dependencies in composer.lock with Vaults')
             ->addOption('check', null, InputOption::VALUE_NONE, 'Report deposit status without starting a run')
             ->addOption('write', null, InputOption::VALUE_NONE, 'Overwrite composer.lock with the rewritten Vaults version')
@@ -51,7 +29,7 @@ final class DepositCommand extends BaseCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $directory = $this->workingDirectory ?? (string) getcwd();
+        $directory = $this->directory();
         $lockPath = $directory.DIRECTORY_SEPARATOR.'composer.lock';
 
         if (! is_file($lockPath)) {
@@ -60,40 +38,19 @@ final class DepositCommand extends BaseCommand
             return self::FAILURE;
         }
 
-        $store = $this->store ?? new TokenStore;
-        $token = $store->token();
+        $client = $this->authenticatedClient($output, $input->isInteractive());
 
-        if ($token === null && $input->isInteractive()) {
-            $token = $this->deviceLogin($store, $output);
-        }
-
-        if ($token === null) {
-            $output->writeln('<error>Not authenticated. Run "composer deposit" in an interactive terminal to log in, or set the VAULTS_TOKEN environment variable.</error>');
-
+        if ($client === null) {
             return self::FAILURE;
         }
 
-        $client = ($this->client ?? new VaultsClient)->withToken($token);
-        $manifest = new ProjectManifest;
-        $projectUuid = $input->getOption('project');
-
-        if (is_string($projectUuid) && $projectUuid !== '') {
-            if ($manifest->load($directory) !== $projectUuid) {
-                $manifest->write($directory, $projectUuid);
-                $output->writeln('Linked this directory to project '.$projectUuid.' (.vaults.json written, commit it).');
-            }
-        } else {
-            $projectUuid = $manifest->load($directory);
-        }
+        $override = $input->getOption('project');
 
         try {
-            if ($projectUuid === null && $input->isInteractive()) {
-                $projectUuid = $this->linkInteractively($client, $manifest, $directory, $output);
-            }
+            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output))
+                ->resolve($directory, is_string($override) ? $override : null, $input->isInteractive());
 
             if ($projectUuid === null) {
-                $output->writeln('<error>This directory is not linked to a Vaults project. Pass --project=<uuid> (or commit a .vaults.json) for non-interactive use.</error>');
-
                 return self::FAILURE;
             }
 
@@ -104,110 +61,9 @@ final class DepositCommand extends BaseCommand
             }
 
             return $this->deposit($client, $projectUuid, $lock, $lockPath, (bool) $input->getOption('write'), $output, $directory, $input->isInteractive());
-        } catch (AuthenticationException) {
-            $output->writeln('<error>Your Vaults token was rejected. Run "vaults login" again.</error>');
-
-            return self::FAILURE;
         } catch (VaultsException $exception) {
-            $output->writeln('<error>'.$exception->getMessage().'</error>');
-
-            return self::FAILURE;
+            return $this->reportFailure($exception, $output);
         }
-    }
-
-    private function linkInteractively(VaultsClient $client, ProjectManifest $manifest, string $directory, OutputInterface $output): string
-    {
-        $io = $this->resolveIO();
-        $projects = $client->listProjects();
-
-        $project = null;
-
-        if ($projects !== []) {
-            $options = ['+ Create a new project'];
-
-            foreach ($projects as $candidate) {
-                $options[] = $candidate->name;
-            }
-
-            $selected = (int) $io->select('Which Vaults project should this directory belong to?', $options, '0');
-
-            if ($selected > 0) {
-                $project = $projects[$selected - 1];
-            }
-        }
-
-        if ($project === null) {
-            $project = $this->createProject($client, $io, $output, $directory);
-        }
-
-        $manifest->write($directory, $project->uuid);
-        $output->writeln('Linked this directory to "'.$project->name.'" (.vaults.json written, commit it).');
-
-        return $project->uuid;
-    }
-
-    private function createProject(VaultsClient $client, IOInterface $io, OutputInterface $output, string $directory): Project
-    {
-        $suggested = ProjectName::suggest($directory);
-
-        while (true) {
-            $answer = (string) $io->ask('What should the new project be called? ['.$suggested.'] ', $suggested);
-            $name = ProjectName::normalise($answer !== '' ? $answer : $suggested);
-
-            if (! ProjectName::isValid($name)) {
-                $output->writeln('<error>'.ProjectName::RULE.'</error>');
-
-                continue;
-            }
-
-            try {
-                return $client->createProject($name);
-            } catch (ApiException $exception) {
-                if (! $exception->isValidationError()) {
-                    throw $exception;
-                }
-
-                $output->writeln('<error>'.($exception->firstError('name') ?? $exception->getMessage()).'</error>');
-                $suggested = $name;
-            }
-        }
-    }
-
-    private function deviceLogin(TokenStore $store, OutputInterface $output): ?string
-    {
-        $client = $this->client ?? new VaultsClient;
-        $flow = new DeviceFlow($client, $this->sleeper ?? new NativeSleeper);
-
-        try {
-            $pair = $flow->start((string) (gethostname() ?: 'composer-plugin'));
-        } catch (VaultsException $exception) {
-            $output->writeln('<error>'.$exception->getMessage().'</error>');
-
-            return null;
-        }
-
-        $output->writeln('First, copy your device code: <info>'.$pair->userCode.'</info>');
-        $output->writeln('Then approve it at: <info>'.$pair->verificationUriComplete.'</info>');
-        $output->writeln('Waiting for approval...');
-
-        $result = $flow->await($pair);
-
-        if ($result->isDenied()) {
-            $output->writeln('<error>This sign-in was denied in the browser. Nothing was saved.</error>');
-
-            return null;
-        }
-
-        if (! $result->isApproved() || $result->token === null) {
-            $output->writeln('<error>The device code expired before it was approved.</error>');
-
-            return null;
-        }
-
-        $store->save($result->token, $result->team);
-        $output->writeln('Logged in to team: '.($result->team?->name ?? 'unknown'));
-
-        return $result->token;
     }
 
     private function check(VaultsClient $client, string $projectUuid, string $lock, OutputInterface $output): int
@@ -244,7 +100,7 @@ final class DepositCommand extends BaseCommand
         $output->writeln('Deposit run started.');
 
         while (! $run->isFinished()) {
-            ($this->sleeper ?? new NativeSleeper)->sleep(2);
+            $this->sleeper()->sleep(2);
 
             $run = $client->getRun($run->uuid);
 

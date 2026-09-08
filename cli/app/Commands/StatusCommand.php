@@ -38,7 +38,7 @@ class StatusCommand extends Command
         }
 
         try {
-            $projects = $client->listProjects();
+            $project = $client->findProject($projectUuid);
         } catch (AuthenticationException) {
             $this->error('Not authenticated. Run vaults login first.');
 
@@ -49,11 +49,7 @@ class StatusCommand extends Command
             return self::FAILURE;
         }
 
-        foreach ($projects as $project) {
-            if ($project->uuid !== $projectUuid) {
-                continue;
-            }
-
+        if ($project !== null) {
             $this->info($project->name);
             $this->table(['Metric', 'Value'], [
                 ['Deposit', $project->depositPercentage.'%'],

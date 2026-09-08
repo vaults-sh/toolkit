@@ -54,10 +54,15 @@ jobs:
           cp builds/vaults /tmp/vaults-assert.phar
           php -r '$phar = new Phar("/tmp/vaults-assert.phar"); exit(isset($phar["vendor/vaults/php-client/src/VaultsClient.php"]) ? 0 : 1);'
           php builds/vaults --version
+      - name: Write the PHAR checksum
+        working-directory: cli/builds
+        run: sha256sum vaults > vaults.sha256
       - name: Attach PHAR to the release
         uses: softprops/action-gh-release@v2
         with:
-          files: cli/builds/vaults
+          files: |
+            cli/builds/vaults
+            cli/builds/vaults.sha256
           generate_release_notes: true
 
   split-client:

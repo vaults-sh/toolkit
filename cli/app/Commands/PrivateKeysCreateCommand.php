@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
-use App\Services\ComposerConfigWriter;
 use LaravelZero\Framework\Commands\Command;
+use Vaults\Composer\ComposerConfigWriter;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
 use Vaults\VaultsClient;

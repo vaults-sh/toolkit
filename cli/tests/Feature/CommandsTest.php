@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Services\ComposerConfigWriter;
-use App\Services\EdgeProbe;
 use App\Services\LockContentHash;
 use Illuminate\Support\Sleep;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
+use Vaults\Composer\ComposerConfigWriter;
+use Vaults\Diagnostics\EdgeProbe;
 use Vaults\VaultsClient;
 
 beforeEach(function () {

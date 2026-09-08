@@ -11,8 +11,8 @@ This repository holds the three client-side pieces, developed together and relea
 | Package | What it does |
 | --- | --- |
 | [`vaults/php-client`](packages/php-client) | Zero-dependency PHP client for the Vaults API. |
-| [`vaults/composer-plugin`](packages/composer-plugin) | Adds `composer deposit` to any project. |
-| `vaults` CLI ([`cli/`](cli)) | Standalone PHAR with `vaults login`, `vaults deposit`, `vaults doctor`, and `vaults status`. |
+| [`vaults/composer-plugin`](packages/composer-plugin) | Adds `composer deposit` and the full `composer vaults:*` command set to any project. |
+| `vaults` CLI ([`cli/`](cli)) | Standalone PHAR with the same commands as the plugin, for machines that do not have a Composer project. |
 
 ## Install
 
@@ -23,16 +23,33 @@ composer require --dev vaults/composer-plugin
 composer deposit
 ```
 
-Or use the CLI. Download the latest `vaults` PHAR from the [Releases](https://github.com/vaults-sh/toolkit/releases) page:
+Or use the CLI, which installs itself and keeps itself current with `vaults self-update`:
 
 ```bash
-chmod +x vaults && mv vaults /usr/local/bin/vaults
+curl -fsSL https://vaults.sh/install.sh | sh
 vaults deposit
 ```
 
 Both authenticate with a browser device login and walk you through picking or creating a project, so
 there are no UUIDs to copy and no dashboard to open. Once a project is deposited, `composer install`
 runs entirely from the Vaults edge, and neither tool is needed at install time.
+
+The plugin and the CLI expose the same commands, so you never need both:
+
+| Plugin | CLI | Purpose |
+| --- | --- | --- |
+| `composer deposit` / `composer vaults:deposit` | `vaults deposit` | Deposit `composer.lock`; `--check`, `--write`, `--project=` |
+| `composer vaults:login` | `vaults login` | Browser device login, or `--token=` |
+| `composer vaults:logout` | `vaults logout` | Forget stored credentials |
+| `composer vaults:init` | `vaults init` | Link the directory to a project without depositing |
+| `composer vaults:status` | `vaults status` | Deposit status of the linked project |
+| `composer vaults:doctor` | `vaults doctor` | API, auth, DNS and edge health checks |
+| `composer vaults:connect` | `vaults connect` | Open the dashboard to connect a git provider |
+| `composer vaults:private:link` | `vaults private:link` | Install your team's private packages; `--global` |
+| `composer vaults:private:keys` | `vaults private:keys` | List private access keys |
+| `composer vaults:private:keys:create` | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write` |
+| `composer vaults:private:keys:revoke` | `vaults private:keys:revoke` | Revoke a key |
+| `composer update vaults/composer-plugin` | `vaults self-update` | Upgrade the tool itself |
 
 ## Development
 

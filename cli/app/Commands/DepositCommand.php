@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Concerns\ResolvesProject;
-use App\Services\ComposerConfigWriter;
 use App\Services\LockContentHash;
 use LaravelZero\Framework\Commands\Command;
+use Vaults\Composer\ComposerConfigWriter;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
