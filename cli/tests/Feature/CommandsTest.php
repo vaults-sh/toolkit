@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Services\LockContentHash;
 use Illuminate\Support\Sleep;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
 use Vaults\Composer\ComposerConfigWriter;
+use Vaults\Composer\LockContentHash;
 use Vaults\Diagnostics\EdgeProbe;
 use Vaults\VaultsClient;
 
@@ -108,7 +108,7 @@ it('runs a full deposit and writes the lock with --write', function () {
 
     $this->artisan('deposit', ['--write' => true])
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('composer.lock rewritten to install from Vaults')
+        ->expectsOutputToContain('composer.lock now installs from Vaults')
         ->expectsOutputToContain('repositories')
         ->assertExitCode(0);
 
@@ -738,7 +738,8 @@ it('lists every package that did not deposit with its reason and offers credenti
         ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
         ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
-        ->expectsOutputToContain('Run vaults private:link so this project can install them from your private repository.')
+        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'no')
+        ->expectsOutputToContain('Run vaults private:link when you are ready')
         ->assertExitCode(0);
 
     expect(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
@@ -826,6 +827,7 @@ it('detects paid repositories in composer.lock before depositing and asks to use
         ->expectsConfirmation('Use the satis.dedoc.co credentials?', 'yes')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
         ->expectsConfirmation('Add it now?', 'no')
+        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'no')
         ->expectsOutputToContain('Deposited 2')
         ->assertExitCode(0);
 
@@ -855,4 +857,64 @@ it('does not ask again after the run for a repository declined up front', functi
         ->assertExitCode(1);
 
     expect(count($this->transport->requests))->toBe(4);
+});
+
+it('wires the private repository and key from the deposit when private packages were deposited', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
+    file_put_contents($this->workDir.'/composer.json', json_encode(['name' => 'acme/app', 'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]));
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $writer = new class extends ComposerConfigWriter
+    {
+        public ?string $privateUrl = null;
+
+        public function addPrivateRepository(string $directory, string $url): bool
+        {
+            $this->privateUrl = $url;
+
+            return true;
+        }
+    };
+    $this->app->instance(ComposerConfigWriter::class, $writer);
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1, 'items' => [
+        ['uuid' => 'i2', 'status' => 'deposited', 'error' => null, 'private' => true, 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": [], "rewritten": true}', 'repositories' => [
+        'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+    ]]);
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+
+    $this->artisan('deposit', ['--write' => true])
+        ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
+        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'yes')
+        ->expectsOutputToContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
+        ->expectsOutputToContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
+        ->assertExitCode(0);
+
+    $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+    $lock = (string) file_get_contents($this->workDir.'/composer.lock');
+
+    expect($writer->privateUrl)->toBe('https://private.vaults-edge.net')
+        ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
+        ->and($lock)->toContain('"rewritten": true')
+        ->and($lock)->toContain('"content-hash": "'.(new LockContentHash)->contentHash((string) file_get_contents($this->workDir.'/composer.json')).'"');
+});
+
+it('keeps composer.lock in sync when private:link edits composer.json', function () {
+    file_put_contents($this->workDir.'/composer.json', json_encode(['name' => 'acme/app']));
+    file_put_contents($this->workDir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
+    queueCreatedKey($this->transport, 'vault-key-xyz');
+
+    $this->artisan('private:link', ['--name' => 'tom-macbook', '--no-public' => true])
+        ->expectsOutputToContain('Added the private Vaults repository to composer.json.')
+        ->assertExitCode(0)
+        ->run();
+
+    $composer = (string) file_get_contents($this->workDir.'/composer.json');
+
+    expect($composer)->toContain('private.vaults-edge.net')
+        ->and((string) file_get_contents($this->workDir.'/composer.lock'))->toContain('"content-hash": "'.(new LockContentHash)->contentHash($composer).'"');
 });

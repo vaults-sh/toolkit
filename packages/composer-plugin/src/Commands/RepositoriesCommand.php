@@ -15,7 +15,7 @@ final class RepositoriesCommand extends VaultsCommand
 {
     protected function configure(): void
     {
-        $this->setName('vaults:repositories')->setDescription('List the paid or private Composer repositories your team has given Vaults credentials for');
+        $this->setName('vaults:repositories')->setDescription('List the third-party private Composer repositories your team has given Vaults credentials for');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

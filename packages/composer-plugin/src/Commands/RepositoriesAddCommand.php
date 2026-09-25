@@ -17,7 +17,7 @@ final class RepositoriesAddCommand extends VaultsCommand
     protected function configure(): void
     {
         $this->setName('vaults:repositories:add')
-            ->setDescription('Give Vaults the credentials for a paid or private Composer repository so its packages can be deposited')
+            ->setDescription('Give Vaults the credentials for a third-party private Composer repository so its packages can be deposited')
             ->addArgument('host', InputArgument::REQUIRED, 'The repository host, e.g. satis.example.com')
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'http-basic or bearer')
             ->addOption('username', null, InputOption::VALUE_REQUIRED, 'Username for http-basic')

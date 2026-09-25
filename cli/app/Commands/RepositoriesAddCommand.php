@@ -24,7 +24,7 @@ class RepositoriesAddCommand extends Command
         {--secret= : Password or token (prefer auth.json or the prompt over passing this on the command line)}
         {--from-auth : Take the credentials from auth.json without asking}';
 
-    protected $description = 'Give Vaults the credentials for a paid or private Composer repository so its packages can be deposited';
+    protected $description = 'Give Vaults the credentials for a third-party private Composer repository so its packages can be deposited';
 
     public function handle(VaultsClient $client, AuthJson $authJson): int
     {

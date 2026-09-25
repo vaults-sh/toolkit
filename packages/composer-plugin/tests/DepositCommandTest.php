@@ -8,6 +8,8 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Tests\Support\FakeIO;
 use Tests\Support\FakeTransport;
 use Vaults\Auth\TokenStore;
+use Vaults\Composer\ComposerConfigWriter;
+use Vaults\Composer\LockContentHash;
 use Vaults\ComposerPlugin\DepositCommand;
 use Vaults\ComposerPlugin\VaultsPlugin;
 use Vaults\Support\FakeSleeper;
@@ -81,7 +83,7 @@ it('runs a full deposit and writes the lock', function () {
     $exit = $this->tester->execute(['--write' => true]);
 
     expect($exit)->toBe(0)
-        ->and($this->tester->getDisplay())->toContain('composer.lock rewritten to install from Vaults')
+        ->and($this->tester->getDisplay())->toContain('composer.lock now installs from Vaults')
         ->and((string) file_get_contents($this->workDir.'/composer.lock'))->toContain('"rewritten":true');
 });
 
@@ -336,7 +338,7 @@ it('lists every package that did not deposit with its reason and offers credenti
         ],
     ]);
 
-    $this->io->queue(true)->queue(false);
+    $this->io->queue(true)->queue(false)->queue(false);
 
     $exit = $this->tester->execute([]);
     $display = $this->tester->getDisplay();
@@ -348,7 +350,7 @@ it('lists every package that did not deposit with its reason and offers credenti
         ->and($display)->toContain('1 local path dependency skipped')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
         ->and($display)->toContain('dedoc/scramble-pro was deposited as a private package for your team.')
-        ->and($display)->toContain('composer vaults:private:link')
+        ->and($display)->toContain('Run composer vaults:private:link when you are ready')
         ->and($this->io->questions[0])->toContain('Give Vaults the credentials for satis.dedoc.co from ./auth.json and deposit again?')
         ->and(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 });
@@ -390,7 +392,7 @@ it('detects paid repositories in composer.lock before depositing and asks to use
         'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net'],
     ]]);
 
-    $this->io->queue(true)->queue(false);
+    $this->io->queue(true)->queue(false)->queue(false);
 
     $exit = $this->tester->execute([]);
     $display = $this->tester->getDisplay();
@@ -401,7 +403,7 @@ it('detects paid repositories in composer.lock before depositing and asks to use
         ->and($display)->toContain('credentials in ./auth.json (bearer)')
         ->and($this->io->questions[0])->toBe('Use the satis.dedoc.co credentials? [Y/n] ')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
-        ->and($display)->toContain('composer vaults:private:link')
+        ->and($display)->toContain('Run composer vaults:private:link when you are ready')
         ->and($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')
         ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'bearer', 'secret' => 'tok']);
 });
@@ -423,4 +425,66 @@ it('skips the up-front question when the team already holds the credentials', fu
     expect($this->tester->execute([]))->toBe(0)
         ->and($this->io->questions)->toBe(['Add it now? [Y/n] '])
         ->and(count($this->transport->requests))->toBe(4);
+});
+
+it('wires the private repository and key from the deposit when private packages were deposited', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
+    file_put_contents($this->workDir.'/composer.json', json_encode(['name' => 'acme/app', 'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]));
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $writer = new class extends ComposerConfigWriter
+    {
+        public ?string $privateUrl = null;
+
+        public function addPrivateRepository(string $directory, string $url): bool
+        {
+            $this->privateUrl = $url;
+
+            return true;
+        }
+    };
+
+    $command = new DepositCommand(
+        new VaultsClient(null, 'https://vaults.test', $this->transport, 'https://auth.vaults.test'),
+        $this->store,
+        $this->workDir,
+        new FakeSleeper,
+        $this->io,
+        null,
+        $writer,
+    );
+    $command->setApplication(new Application);
+    $tester = new CommandTester($command);
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 1, 'items' => [
+        ['uuid' => 'i2', 'status' => 'deposited', 'error' => null, 'private' => true, 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['composer_lock' => '{"content-hash": "0000000000000000000000000000dead", "packages": [], "rewritten": true}', 'repositories' => [
+        'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+    ]]);
+    $this->transport->queueJson([
+        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => '2027-09-08T00:00:00Z'],
+        'token' => 'vault-key-xyz',
+        'host' => 'private.vaults-edge.net',
+        'repository_url' => 'https://private.vaults-edge.net',
+    ], 201);
+    $this->transport->queueJson(['data' => []]);
+
+    $this->io->queue(true);
+
+    $exit = $tester->execute(['--write' => true]);
+    $display = $tester->getDisplay();
+    $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
+    $lock = (string) file_get_contents($this->workDir.'/composer.lock');
+
+    expect($exit)->toBe(0)
+        ->and($this->io->questions)->toBe(['Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json) [Y/n] '])
+        ->and($display)->toContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
+        ->and($display)->toContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
+        ->and($writer->privateUrl)->toBe('https://private.vaults-edge.net')
+        ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
+        ->and($lock)->toContain('"rewritten": true')
+        ->and($lock)->toContain('"content-hash": "'.(new LockContentHash)->contentHash((string) file_get_contents($this->workDir.'/composer.json')).'"');
 });

@@ -36,7 +36,7 @@ class ComposerConfigWriter
 
         exec($command, $output, $exitCode);
 
-        return $exitCode === 0;
+        return $exitCode === 0 && $this->refreshLockHash($directory);
     }
 
     public function addPrivateRepository(string $directory, string $url): bool
@@ -55,7 +55,14 @@ class ComposerConfigWriter
 
         exec($command, $output, $exitCode);
 
-        return $exitCode === 0;
+        return $exitCode === 0 && $this->refreshLockHash($directory);
+    }
+
+    protected function refreshLockHash(string $directory): bool
+    {
+        (new LockContentHash)->refreshFile($directory);
+
+        return true;
     }
 
     public function writeBearerToken(string $authPath, string $host, string $token): bool

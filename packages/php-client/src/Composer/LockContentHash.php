@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace Vaults\Composer;
 
-class LockContentHash
+final class LockContentHash
 {
     public function refresh(string $lockJson, string $composerJsonPath): string
     {
@@ -15,6 +15,28 @@ class LockContentHash
         $hash = $this->contentHash((string) file_get_contents($composerJsonPath));
 
         return (string) preg_replace('/"content-hash":\s*"[a-f0-9]+"/', '"content-hash": "'.$hash.'"', $lockJson, 1);
+    }
+
+    /**
+     * Rewrites composer.lock's content-hash after composer.json changed, so composer install
+     * never warns about a stale lock because of an edit we made.
+     */
+    public function refreshFile(string $directory): bool
+    {
+        $lockPath = $directory.DIRECTORY_SEPARATOR.'composer.lock';
+
+        if (! is_file($lockPath)) {
+            return false;
+        }
+
+        $current = (string) file_get_contents($lockPath);
+        $refreshed = $this->refresh($current, $directory.DIRECTORY_SEPARATOR.'composer.json');
+
+        if ($refreshed === $current) {
+            return false;
+        }
+
+        return file_put_contents($lockPath, $refreshed) !== false;
     }
 
     public function contentHash(string $composerJsonContents): string

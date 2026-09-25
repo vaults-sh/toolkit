@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vaults\ComposerPlugin\Support;
 
 use Composer\Json\JsonManipulator;
+use Vaults\Composer\LockContentHash;
 
 final class ComposerJsonRepositories
 {
@@ -55,6 +56,7 @@ final class ComposerJsonRepositories
         }
 
         file_put_contents($path, $manipulator->getContents());
+        (new LockContentHash)->refreshFile($directory);
 
         return true;
     }

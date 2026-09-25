@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Concerns\ResolvesProject;
-use App\Services\LockContentHash;
 use LaravelZero\Framework\Commands\Command;
+use RuntimeException;
 use Vaults\Composer\AuthJson;
 use Vaults\Composer\ComposerConfigWriter;
+use Vaults\Composer\LockContentHash;
+use Vaults\Composer\PrivateLink;
 use Vaults\Composer\PrivateRepositoryDetector;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
@@ -131,18 +133,16 @@ class DepositCommand extends Command
         $rewritten = spin(fn () => $client->getRewrittenLock($run->uuid), 'Fetching the rewritten lock...');
 
         $this->offerRepositoryWiring($rewritten, $directory);
-
-        $privateUrl = $rewritten->privateRepository['url'] ?? null;
-
-        foreach ($report->privateHint($run, is_string($privateUrl) && resolve(ComposerConfigWriter::class)->hasRepository($directory, $privateUrl)) as $line) {
-            $this->line($line);
-        }
+        $this->offerPrivateWiring($client, $run, $rewritten, $directory, $report);
 
         if ($this->option('write')) {
             file_put_contents($lockPath, resolve(LockContentHash::class)->refresh($rewritten->composerLock, $directory.DIRECTORY_SEPARATOR.'composer.json'));
-            $this->info('composer.lock rewritten to install from Vaults. Run composer install.');
+            $this->newLine();
+            $this->line('<fg=green>✓</> composer.lock now installs from Vaults. Nothing to reinstall here.');
+            $this->line('<fg=gray>Commit composer.json, composer.lock and .vaults.json. Installing needs no Vaults token, in CI or anywhere else.</>');
         } else {
-            $this->line('Run vaults deposit --write to rewrite composer.lock, then composer install.');
+            $this->newLine();
+            $this->line('Run <options=bold>vaults deposit --write</> to pin composer.lock to Vaults.');
         }
 
         if ($run->packagesFailed > 0) {
@@ -153,6 +153,40 @@ class DepositCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function offerPrivateWiring(VaultsClient $client, DepositRun $run, RewrittenLock $rewritten, string $directory, DepositReport $report): void
+    {
+        $privateUrl = $rewritten->privateRepository['url'] ?? null;
+        $writer = resolve(ComposerConfigWriter::class);
+        $configured = is_string($privateUrl) && $writer->hasRepository($directory, $privateUrl);
+        $private = $run->depositedPrivateItems();
+
+        if ($private === [] || $configured) {
+            return;
+        }
+
+        $this->newLine();
+        $this->line(count($private) === 1
+            ? '<fg=cyan>'.$private[0]->package.'</> was deposited as a private package for your team.'
+            : '<fg=cyan>'.count($private).' packages</> were deposited as private packages for your team.');
+
+        if (! $this->input->isInteractive() || ! confirm('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)')) {
+            $this->line('<fg=gray>→</> Run <options=bold>vaults private:link</> when you are ready to install them from Vaults.');
+
+            return;
+        }
+
+        try {
+            $wired = (new PrivateLink($client))->wire($writer, $directory, $directory.DIRECTORY_SEPARATOR.'auth.json', PrivateLink::defaultKeyName(), 365);
+        } catch (VaultsException|RuntimeException $exception) {
+            $this->error($exception->getMessage());
+
+            return;
+        }
+
+        $this->line('<fg=green>✓</> Added the private Vaults repository to composer.json and wrote key "'.$wired['key']->name.'" to ./auth.json.');
+        $this->line('<comment>Do not commit auth.json. Revoke the key any time in team settings or with vaults private:keys:revoke '.$wired['key']->uuid.'.</comment>');
     }
 
     private function offerPrivateRepositories(VaultsClient $client, string $lock, string $directory): void

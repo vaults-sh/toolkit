@@ -14,7 +14,7 @@ class RepositoriesCommand extends Command
 {
     protected $signature = 'repositories';
 
-    protected $description = 'List the paid or private Composer repositories your team has given Vaults credentials for';
+    protected $description = 'List the third-party private Composer repositories your team has given Vaults credentials for';
 
     public function handle(VaultsClient $client): int
     {

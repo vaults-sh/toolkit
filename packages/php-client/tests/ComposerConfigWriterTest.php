@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Vaults\Composer\ComposerConfigWriter;
+use Vaults\Composer\LockContentHash;
 
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/vaults-writer-'.uniqid();
@@ -40,4 +41,16 @@ it('resolves the global auth path from COMPOSER_HOME first', function () {
     expect((new ComposerConfigWriter)->globalAuthPath())->toBe($this->dir.'/home/auth.json');
 
     putenv('COMPOSER_HOME');
+});
+
+it('refreshes the lock content hash after adding a repository', function () {
+    file_put_contents($this->dir.'/composer.json', json_encode(['name' => 'acme/app', 'repositories' => []]));
+    file_put_contents($this->dir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
+
+    $writer = new ComposerConfigWriter;
+
+    expect($writer->addPrivateRepository($this->dir, 'https://private.vaults-edge.net'))->toBeTrue()
+        ->and($writer->hasRepository($this->dir, 'https://private.vaults-edge.net'))->toBeTrue()
+        ->and((string) file_get_contents($this->dir.'/composer.lock'))->not->toContain('dead')
+        ->and((string) file_get_contents($this->dir.'/composer.lock'))->toContain((new LockContentHash)->contentHash((string) file_get_contents($this->dir.'/composer.json')));
 });

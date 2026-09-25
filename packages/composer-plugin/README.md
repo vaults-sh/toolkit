@@ -46,7 +46,7 @@ composer vaults:private:keys:create "GitHub Actions" [--package=vendor/name]... 
 composer vaults:private:keys:revoke <key-uuid>
 ```
 
-## Paid and private Composer repositories
+## Third-party private Composer repositories
 
 ```bash
 composer vaults:repositories                 # hosts your team has given Vaults credentials for
@@ -54,7 +54,7 @@ composer vaults:repositories:add <host> [--from-auth] [--type=http-basic|bearer]
 composer vaults:repositories:remove <host>
 ```
 
-Before a deposit starts, the plugin reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that your team has not given Vaults yet, asks whether to use them; say yes and those packages deposit privately in the same run. Anything that still cannot deposit is listed afterwards with its reason; a paid or private Composer repository (a vendor's Satis, Private Packagist) shows as `needs credentials for <host>`. Vaults uses them only to download that host's packages for your team, stores the result as private packages served from your private repository (wire it with `composer vaults:private:link`), and never shares them with other teams. Storing credentials confirms your team holds the licence for those packages.
+Before a deposit starts, the plugin reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that your team has not given Vaults yet, asks whether to use them; say yes and those packages deposit privately in the same run. Anything that still cannot deposit is listed afterwards with its reason; a third-party private Composer repository (a vendor's Satis, Private Packagist) shows as `needs credentials for <host>`. Vaults uses them only to download that host's packages for your team, stores the result as private packages served from your private repository, and never shares them with other teams. The deposit offers to wire that repository and a key into the project straight away; `composer vaults:private:link` does the same on another machine. Every command that edits `composer.json` refreshes the lock's content hash, so `composer install` never warns about a stale lock because of Vaults. Storing credentials confirms your team holds the licence for those packages.
 
 `private:link` creates a revocable key named after your machine, valid for a year by default; re-running it rotates the key. For CI or a client project, create a dedicated key with `private:keys:create` and put it in `COMPOSER_AUTH` or the consuming project's `auth.json`. Never commit `auth.json`.
 
