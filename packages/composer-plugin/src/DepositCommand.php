@@ -8,11 +8,15 @@ use Composer\Package\Locker;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Vaults\Composer\AuthJson;
+use Vaults\Composer\PrivateRepositoryDetector;
 use Vaults\ComposerPlugin\Support\ComposerJsonRepositories;
 use Vaults\ComposerPlugin\Support\ProjectLinker;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
 use Vaults\Project\ProjectManifest;
+use Vaults\Report\DepositReport;
+use Vaults\Result\DepositRun;
 use Vaults\VaultsClient;
 
 final class DepositCommand extends VaultsCommand
@@ -93,32 +97,52 @@ final class DepositCommand extends VaultsCommand
         return self::SUCCESS;
     }
 
-    private function deposit(VaultsClient $client, string $projectUuid, string $lock, string $lockPath, bool $write, OutputInterface $output, string $directory, bool $interactive): int
+    /** @var list<string> */
+    private array $declinedHosts = [];
+
+    private function deposit(VaultsClient $client, string $projectUuid, string $lock, string $lockPath, bool $write, OutputInterface $output, string $directory, bool $interactive, bool $retried = false): int
     {
+        if (! $retried) {
+            $this->offerPrivateRepositories($client, $lock, $directory, $output, $interactive);
+        }
+
         $run = $client->deposit($projectUuid, $lock);
 
         $output->writeln('Deposit run started.');
 
         while (! $run->isFinished()) {
             $this->sleeper()->sleep(2);
-
             $run = $client->getRun($run->uuid);
-
             $output->write("\r".'Deposited '.$run->packagesDeposited.'/'.$run->packagesTotal.'...');
         }
 
+        $report = new DepositReport('composer vaults:');
+
         $output->writeln('');
-        $output->writeln('Deposited: '.$run->packagesDeposited.' · Skipped: '.$run->packagesSkipped.' · Failed: '.$run->packagesFailed);
+        $output->writeln($report->summary($run));
+        $output->writeln($report->coverage($run));
+
+        foreach ($report->problems($run) as $line) {
+            $output->writeln($line);
+        }
 
         if ($run->status !== 'completed') {
-            $output->writeln('<error>The deposit run failed. See the Vaults dashboard for details.</error>');
+            $output->writeln('<error>The deposit run failed. Run "composer vaults:open" to inspect it.</error>');
 
             return self::FAILURE;
+        }
+
+        if (! $retried && $this->offerCredentials($client, $run, $directory, $output, $interactive)) {
+            return $this->deposit($client, $projectUuid, $lock, $lockPath, $write, $output, $directory, $interactive, retried: true);
         }
 
         $rewritten = $client->getRewrittenLock($run->uuid);
 
         $this->finishWiring($rewritten->projectRepository, $directory, $output, $interactive);
+
+        foreach ($report->privateHint($run, ComposerJsonRepositories::has($directory, $rewritten->privateRepository)) as $line) {
+            $output->writeln($line);
+        }
 
         if ($write) {
             file_put_contents($lockPath, $this->withRefreshedContentHash($rewritten->composerLock, $directory));
@@ -127,7 +151,89 @@ final class DepositCommand extends VaultsCommand
             $output->writeln('Run "composer vaults:deposit --write" to rewrite composer.lock, then "composer install".');
         }
 
+        if ($run->packagesFailed > 0) {
+            $output->writeln('<comment>'.$run->packagesFailed.' package'.($run->packagesFailed === 1 ? '' : 's').' did not deposit; installs still depend on their original hosts.</comment>');
+
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    private function offerPrivateRepositories(VaultsClient $client, string $lock, string $directory, OutputInterface $output, bool $interactive): void
+    {
+        if (! $interactive) {
+            return;
+        }
+
+        $detector = new PrivateRepositoryDetector;
+
+        if ($detector->detect($lock, $directory, []) === []) {
+            return;
+        }
+
+        try {
+            $teamCredentials = $client->listRepositoryCredentials();
+        } catch (VaultsException) {
+            $teamCredentials = [];
+        }
+
+        foreach ($detector->detect($lock, $directory, $teamCredentials) as $repository) {
+            $count = count($repository['packages']);
+            $output->writeln('composer.lock has '.$count.' package'.($count === 1 ? '' : 's').' from '.$repository['host'].' ('.implode(', ', array_slice($repository['packages'], 0, 3)).($count > 3 ? ', …' : '').'), and '.$repository['credentials']['source'].' has credentials for it.');
+
+            if (! $this->resolveIO()->askConfirmation('Let Vaults use those credentials to deposit them privately for your team? [Y/n] ')) {
+                $this->declinedHosts[] = $repository['host'];
+                $output->writeln('Skipping '.$repository['host'].'. Run "composer vaults:repositories:add '.$repository['host'].'" later to deposit them.');
+
+                continue;
+            }
+
+            try {
+                $client->storeRepositoryCredential($repository['host'], $repository['credentials']['type'], $repository['credentials']['secret'], $repository['credentials']['username']);
+                $output->writeln('<info>Saved credentials for '.$repository['host'].'. Its packages will be deposited privately for your team.</info>');
+            } catch (VaultsException $exception) {
+                $output->writeln('<error>'.$exception->getMessage().'</error>');
+            }
+        }
+    }
+
+    private function offerCredentials(VaultsClient $client, DepositRun $run, string $directory, OutputInterface $output, bool $interactive): bool
+    {
+        if (! $interactive) {
+            return false;
+        }
+
+        $uploaded = false;
+
+        foreach ($run->hostsNeedingCredentials() as $host) {
+            if (in_array($host, $this->declinedHosts, true)) {
+                continue;
+            }
+
+            $found = (new AuthJson)->credentialsFor($host, $directory);
+
+            if ($found === null) {
+                continue;
+            }
+
+            if (! $this->resolveIO()->askConfirmation('Give Vaults the credentials for '.$host.' from '.$found['source'].' and deposit again? [Y/n] ')) {
+                continue;
+            }
+
+            try {
+                $client->storeRepositoryCredential($host, $found['type'], $found['secret'], $found['username']);
+            } catch (VaultsException $exception) {
+                $output->writeln('<error>'.$exception->getMessage().'</error>');
+
+                continue;
+            }
+
+            $output->writeln('<info>Saved credentials for '.$host.'. Its packages will be deposited privately for your team.</info>');
+            $uploaded = true;
+        }
+
+        return $uploaded;
     }
 
     private function withRefreshedContentHash(string $lockJson, string $directory): string

@@ -55,6 +55,46 @@ final readonly class DepositRun
         return in_array($this->status, ['completed', 'failed'], true);
     }
 
+    /**
+     * @return list<DepositRunItem>
+     */
+    public function failedItems(): array
+    {
+        return array_values(array_filter($this->items ?? [], fn (DepositRunItem $item): bool => $item->isFailed()));
+    }
+
+    /**
+     * @return list<DepositRunItem>
+     */
+    public function skippedItems(): array
+    {
+        return array_values(array_filter($this->items ?? [], fn (DepositRunItem $item): bool => $item->isSkipped()));
+    }
+
+    /**
+     * @return list<DepositRunItem>
+     */
+    public function depositedPrivateItems(): array
+    {
+        return array_values(array_filter($this->items ?? [], fn (DepositRunItem $item): bool => $item->isDeposited() && $item->private));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function hostsNeedingCredentials(): array
+    {
+        $hosts = [];
+
+        foreach ($this->failedItems() as $item) {
+            if ($item->needsCredentials() && $item->host !== null) {
+                $hosts[$item->host] = true;
+            }
+        }
+
+        return array_keys($hosts);
+    }
+
     public function coverablePackages(): int
     {
         return max(0, $this->packagesTotal - $this->packagesPrivate);

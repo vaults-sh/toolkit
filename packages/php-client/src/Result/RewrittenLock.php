@@ -8,10 +8,12 @@ final readonly class RewrittenLock
 {
     /**
      * @param  array<string, mixed>  $projectRepository
+     * @param  array<string, mixed>  $privateRepository
      */
     public function __construct(
         public string $composerLock,
         public array $projectRepository,
+        public array $privateRepository = [],
     ) {}
 
     /**
@@ -24,6 +26,7 @@ final readonly class RewrittenLock
         return new self(
             (string) ($data['composer_lock'] ?? ''),
             is_array($repositories['project'] ?? null) ? $repositories['project'] : [],
+            is_array($repositories['private'] ?? null) ? $repositories['private'] : [],
         );
     }
 }

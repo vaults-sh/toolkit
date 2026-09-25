@@ -54,6 +54,9 @@ The plugin and the CLI expose the same commands, so you never need both:
 | `composer vaults:private:keys` | `vaults private:keys` | List private access keys |
 | `composer vaults:private:keys:create` | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write` |
 | `composer vaults:private:keys:revoke` | `vaults private:keys:revoke` | Revoke a key |
+| `composer vaults:repositories` | `vaults repositories` | Paid or private Composer repositories the team has given Vaults credentials for |
+| `composer vaults:repositories:add` | `vaults repositories:add` | Store credentials for a host, from `auth.json` or a prompt; `--from-auth`, `--type`, `--username` |
+| `composer vaults:repositories:remove` | `vaults repositories:remove` | Remove a host's credentials |
 | `composer update vaults/composer-plugin` | `vaults self-update` | Upgrade the tool itself |
 
 ## Development

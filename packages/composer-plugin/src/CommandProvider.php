@@ -15,6 +15,9 @@ use Vaults\ComposerPlugin\Commands\PrivateKeysCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
 use Vaults\ComposerPlugin\Commands\PrivateLinkCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesAddCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesRemoveCommand;
 use Vaults\ComposerPlugin\Commands\StatusCommand;
 use Vaults\ComposerPlugin\Commands\TeamsCommand;
 
@@ -38,6 +41,9 @@ final class CommandProvider implements CommandProviderCapability
             new PrivateKeysCommand,
             new PrivateKeysCreateCommand,
             new PrivateKeysRevokeCommand,
+            new RepositoriesCommand,
+            new RepositoriesAddCommand,
+            new RepositoriesRemoveCommand,
         ];
     }
 }

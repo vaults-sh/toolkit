@@ -203,3 +203,63 @@ it('lists, creates, and revokes private keys', function () {
     expect($transport->lastRequest()->method)->toBe('DELETE')
         ->and($transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/private-keys/k2');
 });
+
+it('parses item reasons and derives the hosts that need credentials', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['data' => [
+        'uuid' => 'run-uuid',
+        'status' => 'completed',
+        'packages_total' => 3,
+        'packages_deposited' => 1,
+        'packages_failed' => 1,
+        'packages_skipped' => 1,
+        'items' => [
+            ['uuid' => 'i1', 'status' => 'deposited', 'error' => null, 'private' => true, 'package' => 'a/b', 'version' => 'v1.0.0', 'reference' => 'ref', 'security_status' => 'clear'],
+            ['uuid' => 'i2', 'status' => 'failed', 'error' => 'credentials required for satis.example.com; add them', 'reason' => 'credentials_required', 'host' => 'satis.example.com', 'package' => 'paid/lib', 'version' => 'v2.0.0', 'reference' => 'ref', 'security_status' => 'unknown'],
+            ['uuid' => 'i3', 'status' => 'skipped', 'error' => 'source-only package, no archive to mirror', 'reason' => 'source_only', 'package' => 'git/only', 'version' => 'dev-main', 'reference' => 'ref', 'security_status' => 'unknown'],
+        ],
+    ]]);
+
+    $run = fakeClient($transport)->getRun('run-uuid');
+
+    expect($run->failedItems())->toHaveCount(1)
+        ->and($run->failedItems()[0]->needsCredentials())->toBeTrue()
+        ->and($run->skippedItems()[0]->reason)->toBe('source_only')
+        ->and($run->depositedPrivateItems()[0]->package)->toBe('a/b')
+        ->and($run->hostsNeedingCredentials())->toBe(['satis.example.com']);
+});
+
+it('lists, stores, and deletes repository credentials', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'satis.example.com', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => null, 'created_at' => '2026-09-25T00:00:00Z']]]);
+    $transport->queueJson(['data' => ['uuid' => 'c2', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null]], 201);
+    $transport->queueJson([], 204);
+
+    $client = fakeClient($transport);
+
+    $credentials = $client->listRepositoryCredentials();
+
+    expect($credentials)->toHaveCount(1)
+        ->and($credentials[0]->typeLabel())->toBe('http-basic (tom)');
+
+    $stored = $client->storeRepositoryCredential('repo.packagist.com', 'bearer', 'tok');
+
+    expect($stored->uuid)->toBe('c2')
+        ->and($stored->typeLabel())->toBe('bearer')
+        ->and($transport->requests[1]->method)->toBe('POST')
+        ->and(json_decode((string) $transport->requests[1]->body, true))->toBe(['host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok']);
+
+    $client->deleteRepositoryCredential('c2');
+
+    expect($transport->lastRequest()->method)->toBe('DELETE')
+        ->and($transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repository-credentials/c2');
+});
+
+it('reads the private repository from a rewritten lock', function () {
+    $transport = new FakeTransport;
+    $transport->queueJson(['composer_lock' => '{}', 'repositories' => ['project' => ['url' => 'https://repo.example/p'], 'private' => ['url' => 'https://private.example']]]);
+
+    $rewritten = fakeClient($transport)->getRewrittenLock('run-uuid');
+
+    expect($rewritten->privateRepository['url'])->toBe('https://private.example');
+});

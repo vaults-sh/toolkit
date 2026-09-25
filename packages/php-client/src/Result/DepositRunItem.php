@@ -14,6 +14,9 @@ final readonly class DepositRunItem
         public string $version,
         public string $reference,
         public string $securityStatus,
+        public ?string $reason = null,
+        public ?string $host = null,
+        public bool $private = false,
     ) {}
 
     /**
@@ -29,6 +32,34 @@ final readonly class DepositRunItem
             (string) ($data['version'] ?? ''),
             (string) ($data['reference'] ?? ''),
             (string) ($data['security_status'] ?? 'unknown'),
+            is_string($data['reason'] ?? null) ? $data['reason'] : null,
+            is_string($data['host'] ?? null) ? $data['host'] : null,
+            (bool) ($data['private'] ?? false),
         );
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === 'failed';
+    }
+
+    public function isSkipped(): bool
+    {
+        return $this->status === 'skipped';
+    }
+
+    public function isDeposited(): bool
+    {
+        return $this->status === 'deposited';
+    }
+
+    public function needsCredentials(): bool
+    {
+        return $this->reason === 'credentials_required' || $this->reason === 'credentials_rejected';
+    }
+
+    public function needsSourceConnection(): bool
+    {
+        return $this->reason === 'private_repository';
     }
 }

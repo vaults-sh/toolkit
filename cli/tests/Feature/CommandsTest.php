@@ -706,3 +706,151 @@ it('never asks about the public mirror when the repository is already configured
 
     expect($this->transport->requests)->toHaveCount(3);
 });
+
+it('lists every package that did not deposit with its reason and offers credentials from auth.json', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/auth.json', json_encode(['http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']]]));
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 3]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 3, 'packages_deposited' => 1, 'packages_skipped' => 1, 'packages_failed' => 1, 'items' => [
+        ['uuid' => 'i2', 'status' => 'failed', 'error' => 'credentials required for satis.dedoc.co; add them under Team settings → Repositories', 'reason' => 'credentials_required', 'host' => 'satis.dedoc.co', 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+        ['uuid' => 'i3', 'status' => 'skipped', 'error' => 'source-only package, no archive to mirror', 'reason' => 'source_only', 'package' => 'acme/git-only', 'version' => 'dev-main', 'reference' => 'c', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom']], 201);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-2', 'status' => 'pending', 'packages_total' => 3]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-2', 'status' => 'completed', 'packages_total' => 3, 'packages_deposited' => 2, 'packages_skipped' => 1, 'packages_failed' => 0, 'items' => [
+        ['uuid' => 'i2', 'status' => 'deposited', 'error' => null, 'private' => true, 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson([
+        'composer_lock' => '{"packages":[]}',
+        'repositories' => [
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+            'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
+        ],
+    ]);
+
+    $this->artisan('deposit')
+        ->expectsConfirmation('Give Vaults the credentials for satis.dedoc.co from '.realpath($this->workDir).'/auth.json and deposit again?', 'yes')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  needs credentials for satis.dedoc.co')
+        ->expectsOutputToContain('vaults repositories:add satis.dedoc.co')
+        ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet.')
+        ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
+        ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
+        ->expectsOutputToContain('Run vaults private:link so this project can install them from your private repository.')
+        ->assertExitCode(0);
+
+    expect(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+});
+
+it('exits non-zero when a package failed to deposit even though the run completed', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 2]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 2, 'packages_deposited' => 1, 'packages_failed' => 1, 'items' => [
+        ['uuid' => 'i2', 'status' => 'failed', 'error' => 'credentials rejected by satis.dedoc.co; update them under Team settings → Repositories', 'reason' => 'credentials_rejected', 'host' => 'satis.dedoc.co', 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]);
+
+    $this->artisan('deposit', ['--no-interaction' => true])
+        ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  credentials for satis.dedoc.co were rejected')
+        ->expectsOutputToContain('Update them with: vaults repositories:add satis.dedoc.co')
+        ->expectsOutputToContain('1 package did not deposit; installs still depend on their original hosts.')
+        ->assertExitCode(1);
+});
+
+it('lists, adds from auth.json, and removes repository credentials', function () {
+    file_put_contents($this->workDir.'/auth.json', json_encode(['bearer' => ['repo.packagist.com' => 'tok-123']]));
+
+    $this->transport->queueJson(['data' => []]);
+
+    $this->artisan('repositories')
+        ->expectsOutputToContain('No repository credentials')
+        ->assertExitCode(0);
+
+    $this->transport->queueJson(['data' => ['uuid' => 'c1', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null]], 201);
+
+    $this->artisan('repositories:add', ['host' => 'repo.packagist.com', '--from-auth' => true])
+        ->expectsOutputToContain('Saved bearer credentials for repo.packagist.com')
+        ->assertExitCode(0);
+
+    expect(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok-123']);
+
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
+
+    $this->artisan('repositories')
+        ->expectsTable(['Host', 'Type', 'Last used'], [['repo.packagist.com', 'bearer', 'never']])
+        ->assertExitCode(0);
+
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
+    $this->transport->queueJson([], 204);
+
+    $this->artisan('repositories:remove', ['host' => 'repo.packagist.com'])
+        ->expectsOutputToContain('Removed the credentials for repo.packagist.com')
+        ->assertExitCode(0);
+
+    expect($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repository-credentials/c1');
+});
+
+it('refuses repositories:add non-interactively without credentials to use', function () {
+    $this->artisan('repositories:add', ['host' => 'satis.example.com', '--no-interaction' => true])
+        ->expectsOutputToContain('No credentials for satis.example.com in auth.json')
+        ->assertExitCode(1);
+});
+
+it('detects paid repositories in composer.lock before depositing and asks to use the local credentials', function () {
+    file_put_contents($this->workDir.'/composer.lock', json_encode(['packages' => [
+        ['name' => 'vendor/lib', 'version' => 'v1.0.0', 'dist' => ['url' => 'https://api.github.com/repos/vendor/lib/zipball/a']],
+        ['name' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'dist' => ['url' => 'https://satis.dedoc.co/dist/dedoc/scramble-pro/0.9.15.zip']],
+    ]]));
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/auth.json', json_encode(['http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']]]));
+
+    $this->transport->queueJson(['data' => []]);
+    $this->transport->queueJson(['data' => ['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom']], 201);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 2]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 2, 'packages_deposited' => 2, 'items' => [
+        ['uuid' => 'i2', 'status' => 'deposited', 'error' => null, 'private' => true, 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => [
+        'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        'private' => ['type' => 'composer', 'url' => 'https://private.vaults-edge.net'],
+    ]]);
+
+    $this->artisan('deposit')
+        ->expectsOutputToContain('composer.lock has 1 package from satis.dedoc.co (dedoc/scramble-pro), and '.realpath($this->workDir).'/auth.json has credentials for it.')
+        ->expectsConfirmation('Let Vaults use those credentials to deposit them privately for your team?', 'yes')
+        ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('Deposited: 2')
+        ->assertExitCode(0);
+
+    expect($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')
+        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+});
+
+it('does not ask again after the run for a repository declined up front', function () {
+    file_put_contents($this->workDir.'/composer.lock', json_encode(['packages' => [
+        ['name' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'dist' => ['url' => 'https://satis.dedoc.co/dist/dedoc/scramble-pro/0.9.15.zip']],
+    ]]));
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+    file_put_contents($this->workDir.'/auth.json', json_encode(['http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']]]));
+
+    $this->transport->queueJson(['data' => []]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'pending', 'packages_total' => 1]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-1', 'status' => 'completed', 'packages_total' => 1, 'packages_deposited' => 0, 'packages_failed' => 1, 'items' => [
+        ['uuid' => 'i2', 'status' => 'failed', 'error' => 'credentials required for satis.dedoc.co', 'reason' => 'credentials_required', 'host' => 'satis.dedoc.co', 'package' => 'dedoc/scramble-pro', 'version' => 'v0.9.15', 'reference' => 'b', 'security_status' => 'unknown'],
+    ]]]);
+    $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]);
+
+    $this->artisan('deposit')
+        ->expectsConfirmation('Let Vaults use those credentials to deposit them privately for your team?', 'no')
+        ->expectsOutputToContain('Skipping satis.dedoc.co. Run vaults repositories:add satis.dedoc.co later')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('needs credentials for satis.dedoc.co')
+        ->assertExitCode(1);
+
+    expect(count($this->transport->requests))->toBe(4);
+});

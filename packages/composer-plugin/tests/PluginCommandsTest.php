@@ -19,6 +19,9 @@ use Vaults\ComposerPlugin\Commands\PrivateKeysCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysCreateCommand;
 use Vaults\ComposerPlugin\Commands\PrivateKeysRevokeCommand;
 use Vaults\ComposerPlugin\Commands\PrivateLinkCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesAddCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesCommand;
+use Vaults\ComposerPlugin\Commands\RepositoriesRemoveCommand;
 use Vaults\ComposerPlugin\Commands\StatusCommand;
 use Vaults\ComposerPlugin\Commands\TeamsCommand;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
@@ -101,6 +104,9 @@ it('registers every command under the vaults namespace with deposit kept as an a
         'vaults:private:keys',
         'vaults:private:keys:create',
         'vaults:private:keys:revoke',
+        'vaults:repositories',
+        'vaults:repositories:add',
+        'vaults:repositories:remove',
     ])->and($commands[0]->getAliases())->toBe(['deposit']);
 });
 
@@ -504,4 +510,59 @@ it('never asks about the public mirror when the repository is already configured
     expect($exit)->toBe(0)
         ->and($tester->getDisplay())->toContain('The public Vaults repository is already configured')
         ->and($this->io->questions)->toBe([]);
+});
+
+it('lists, adds from auth.json, and removes repository credentials', function () {
+    file_put_contents($this->workDir.'/auth.json', json_encode(['http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']]]));
+
+    $this->transport->queueJson(['data' => []]);
+
+    $tester = ($this->tester)(RepositoriesCommand::class);
+
+    expect($tester->execute([]))->toBe(0)
+        ->and($tester->getDisplay())->toContain('No repository credentials');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => null]], 201);
+
+    $tester = ($this->tester)(RepositoriesAddCommand::class);
+
+    expect($tester->execute(['host' => 'Satis.Dedoc.co', '--from-auth' => true]))->toBe(0)
+        ->and($tester->getDisplay())->toContain('Saved http-basic (tom) credentials for satis.dedoc.co')
+        ->and($tester->getDisplay())->toContain('licensed');
+
+    $request = $this->transport->lastRequest();
+
+    expect($request->method)->toBe('POST')
+        ->and($request->url)->toBe('https://vaults.test/api/v1/repository-credentials')
+        ->and(json_decode((string) $request->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => '2026-09-25T10:00:00Z']]]);
+
+    $tester = ($this->tester)(RepositoriesCommand::class);
+
+    expect($tester->execute([]))->toBe(0)
+        ->and($tester->getDisplay())->toContain('satis.dedoc.co')
+        ->and($tester->getDisplay())->toContain('2026-09-25')
+        ->and($tester->getDisplay())->not->toContain('hunter2');
+
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => null]]]);
+    $this->transport->queueJson([], 204);
+
+    $tester = ($this->tester)(RepositoriesRemoveCommand::class);
+
+    expect($tester->execute(['host' => 'satis.dedoc.co']))->toBe(0)
+        ->and($this->transport->lastRequest()->method)->toBe('DELETE')
+        ->and($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repository-credentials/c1');
+});
+
+it('refuses to add credentials non-interactively when auth.json has none', function () {
+    $tester = ($this->tester)(RepositoriesAddCommand::class);
+
+    expect($tester->execute(['host' => 'satis.example.com'], ['interactive' => false]))->toBe(1)
+        ->and($tester->getDisplay())->toContain('No credentials for satis.example.com in auth.json');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'c2', 'host' => 'satis.example.com', 'type' => 'bearer', 'username' => null]], 201);
+
+    expect($tester->execute(['host' => 'satis.example.com', '--type' => 'bearer', '--secret' => 'tok'], ['interactive' => false]))->toBe(0)
+        ->and(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['host' => 'satis.example.com', 'type' => 'bearer', 'secret' => 'tok']);
 });

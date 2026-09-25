@@ -12,6 +12,7 @@ use Vaults\Result\DeviceCodePair;
 use Vaults\Result\PollResult;
 use Vaults\Result\PrivateKey;
 use Vaults\Result\Project;
+use Vaults\Result\RepositoryCredential;
 use Vaults\Result\RewrittenLock;
 use Vaults\Result\TeamIdentity;
 use Vaults\Transport\HttpRequest;
@@ -167,6 +168,36 @@ final class VaultsClient
     public function revokePrivateKey(string $keyUuid): void
     {
         $this->guard($this->send('DELETE', '/api/v1/private-keys/'.$keyUuid));
+    }
+
+    /**
+     * @return list<RepositoryCredential>
+     */
+    public function listRepositoryCredentials(): array
+    {
+        $response = $this->send('GET', '/api/v1/repository-credentials');
+        $data = $this->decodeEnvelope($response);
+
+        return array_values(array_map(
+            fn (array $credential): RepositoryCredential => RepositoryCredential::fromArray($credential),
+            array_filter(is_array($data) ? $data : [], 'is_array'),
+        ));
+    }
+
+    public function storeRepositoryCredential(string $host, string $type, string $secret, ?string $username = null): RepositoryCredential
+    {
+        $payload = ['host' => $host, 'type' => $type, 'secret' => $secret];
+
+        if ($username !== null) {
+            $payload['username'] = $username;
+        }
+
+        return RepositoryCredential::fromArray($this->request('POST', '/api/v1/repository-credentials', $payload));
+    }
+
+    public function deleteRepositoryCredential(string $credentialUuid): void
+    {
+        $this->guard($this->send('DELETE', '/api/v1/repository-credentials/'.$credentialUuid));
     }
 
     public function deposit(string $projectUuid, string $composerLock): DepositRun
