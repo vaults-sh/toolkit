@@ -146,7 +146,8 @@ class DepositCommand extends Command
         }
 
         if ($run->packagesFailed > 0) {
-            $this->warn($run->packagesFailed.' package'.($run->packagesFailed === 1 ? '' : 's').' did not deposit; installs still depend on their original hosts.');
+            $this->newLine();
+            $this->line('<fg=red>'.$run->packagesFailed.' package'.($run->packagesFailed === 1 ? '' : 's').' did not deposit</>; installs still depend on their original hosts.');
 
             return self::FAILURE;
         }
@@ -172,20 +173,23 @@ class DepositCommand extends Command
             $teamCredentials = [];
         }
 
-        foreach ($detector->detect($lock, $directory, $teamCredentials) as $repository) {
-            $count = count($repository['packages']);
-            $this->line('composer.lock has '.$count.' package'.($count === 1 ? '' : 's').' from '.$repository['host'].' ('.implode(', ', array_slice($repository['packages'], 0, 3)).($count > 3 ? ', …' : '').'), and '.$repository['credentials']['source'].' has credentials for it.');
+        $repositories = $detector->detect($lock, $directory, $teamCredentials);
 
-            if (! confirm('Let Vaults use those credentials to deposit them privately for your team?')) {
+        foreach ((new DepositReport('vaults '))->privateRepositories($repositories) as $line) {
+            $this->line($line);
+        }
+
+        foreach ($repositories as $repository) {
+            if (! confirm('Use the '.$repository['host'].' credentials?')) {
                 $this->declinedHosts[] = $repository['host'];
-                $this->line('Skipping '.$repository['host'].'. Run vaults repositories:add '.$repository['host'].' later to deposit them.');
+                $this->line('<fg=gray>Skipping '.$repository['host'].'. Run vaults repositories:add '.$repository['host'].' later to deposit those packages.</>');
 
                 continue;
             }
 
             try {
                 $client->storeRepositoryCredential($repository['host'], $repository['credentials']['type'], $repository['credentials']['secret'], $repository['credentials']['username']);
-                $this->info('Saved credentials for '.$repository['host'].'. Its packages will be deposited privately for your team.');
+                $this->line('<fg=green>✓</> Saved credentials for <fg=cyan>'.$repository['host'].'</>. Its packages will be deposited privately for your team.');
             } catch (VaultsException $exception) {
                 $this->error($exception->getMessage());
             }
@@ -223,7 +227,7 @@ class DepositCommand extends Command
                 continue;
             }
 
-            $this->info('Saved credentials for '.$host.'. Its packages will be deposited privately for your team.');
+            $this->line('<fg=green>✓</> Saved credentials for <fg=cyan>'.$host.'</>. Its packages will be deposited privately for your team.');
             $uploaded = true;
         }
 

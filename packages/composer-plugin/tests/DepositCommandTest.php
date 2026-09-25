@@ -342,14 +342,14 @@ it('lists every package that did not deposit with its reason and offers credenti
     $display = $this->tester->getDisplay();
 
     expect($exit)->toBe(0)
-        ->and($display)->toContain('Not deposited:')
+        ->and($display)->toContain('Not deposited')
         ->and($display)->toContain('dedoc/scramble-pro v0.9.15  needs credentials for satis.dedoc.co')
         ->and($display)->toContain('composer vaults:repositories:add satis.dedoc.co')
-        ->and($display)->toContain('1 local path dependency skipped.')
+        ->and($display)->toContain('1 local path dependency skipped')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
         ->and($display)->toContain('dedoc/scramble-pro was deposited as a private package for your team.')
         ->and($display)->toContain('composer vaults:private:link')
-        ->and($this->io->questions[0])->toContain('Give Vaults the credentials for satis.dedoc.co from '.$this->workDir.'/auth.json and deposit again?')
+        ->and($this->io->questions[0])->toContain('Give Vaults the credentials for satis.dedoc.co from ./auth.json and deposit again?')
         ->and(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 });
 
@@ -368,7 +368,7 @@ it('exits non-zero when a package failed to deposit even though the run complete
 
     expect($exit)->toBe(1)
         ->and($display)->toContain('acme/secret v2.0.0  private repository, not hosted on Vaults yet')
-        ->and($display)->toContain('Team settings → Sources')
+        ->and($display)->toContain('Team settings › Sources')
         ->and($display)->toContain('1 package did not deposit; installs still depend on their original hosts.');
 });
 
@@ -396,8 +396,10 @@ it('detects paid repositories in composer.lock before depositing and asks to use
     $display = $this->tester->getDisplay();
 
     expect($exit)->toBe(0)
-        ->and($display)->toContain('composer.lock has 1 package from satis.dedoc.co (dedoc/scramble-pro), and '.$this->workDir.'/auth.json has credentials for it.')
-        ->and($this->io->questions[0])->toContain('Let Vaults use those credentials to deposit them privately for your team?')
+        ->and($display)->toContain('Private repositories in composer.lock')
+        ->and($display)->toContain('satis.dedoc.co  1 package  dedoc/scramble-pro')
+        ->and($display)->toContain('credentials in ./auth.json (bearer)')
+        ->and($this->io->questions[0])->toBe('Use the satis.dedoc.co credentials? [Y/n] ')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
         ->and($display)->toContain('composer vaults:private:link')
         ->and($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')

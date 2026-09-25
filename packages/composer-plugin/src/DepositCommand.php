@@ -152,7 +152,8 @@ final class DepositCommand extends VaultsCommand
         }
 
         if ($run->packagesFailed > 0) {
-            $output->writeln('<comment>'.$run->packagesFailed.' package'.($run->packagesFailed === 1 ? '' : 's').' did not deposit; installs still depend on their original hosts.</comment>');
+            $output->writeln('');
+            $output->writeln('<fg=red>'.$run->packagesFailed.' package'.($run->packagesFailed === 1 ? '' : 's').' did not deposit</>; installs still depend on their original hosts.');
 
             return self::FAILURE;
         }
@@ -178,20 +179,23 @@ final class DepositCommand extends VaultsCommand
             $teamCredentials = [];
         }
 
-        foreach ($detector->detect($lock, $directory, $teamCredentials) as $repository) {
-            $count = count($repository['packages']);
-            $output->writeln('composer.lock has '.$count.' package'.($count === 1 ? '' : 's').' from '.$repository['host'].' ('.implode(', ', array_slice($repository['packages'], 0, 3)).($count > 3 ? ', …' : '').'), and '.$repository['credentials']['source'].' has credentials for it.');
+        $repositories = $detector->detect($lock, $directory, $teamCredentials);
 
-            if (! $this->resolveIO()->askConfirmation('Let Vaults use those credentials to deposit them privately for your team? [Y/n] ')) {
+        foreach ((new DepositReport('composer vaults:'))->privateRepositories($repositories) as $line) {
+            $output->writeln($line);
+        }
+
+        foreach ($repositories as $repository) {
+            if (! $this->resolveIO()->askConfirmation('Use the '.$repository['host'].' credentials? [Y/n] ')) {
                 $this->declinedHosts[] = $repository['host'];
-                $output->writeln('Skipping '.$repository['host'].'. Run "composer vaults:repositories:add '.$repository['host'].'" later to deposit them.');
+                $output->writeln('<fg=gray>Skipping '.$repository['host'].'. Run "composer vaults:repositories:add '.$repository['host'].'" later to deposit those packages.</>');
 
                 continue;
             }
 
             try {
                 $client->storeRepositoryCredential($repository['host'], $repository['credentials']['type'], $repository['credentials']['secret'], $repository['credentials']['username']);
-                $output->writeln('<info>Saved credentials for '.$repository['host'].'. Its packages will be deposited privately for your team.</info>');
+                $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$repository['host'].'</>. Its packages will be deposited privately for your team.');
             } catch (VaultsException $exception) {
                 $output->writeln('<error>'.$exception->getMessage().'</error>');
             }
@@ -229,7 +233,7 @@ final class DepositCommand extends VaultsCommand
                 continue;
             }
 
-            $output->writeln('<info>Saved credentials for '.$host.'. Its packages will be deposited privately for your team.</info>');
+            $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$host.'</>. Its packages will be deposited privately for your team.');
             $uploaded = true;
         }
 

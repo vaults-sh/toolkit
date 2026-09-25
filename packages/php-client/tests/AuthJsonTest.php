@@ -11,11 +11,14 @@ beforeEach(function () {
     mkdir($this->home);
     putenv('COMPOSER_HOME='.$this->home);
     putenv('COMPOSER_AUTH');
+    $this->previousHome = getenv('HOME');
+    putenv('HOME='.$this->dir);
 });
 
 afterEach(function () {
     putenv('COMPOSER_HOME');
     putenv('COMPOSER_AUTH');
+    putenv('HOME='.$this->previousHome);
 });
 
 it('finds http-basic and bearer entries for a host, case-insensitively', function () {
@@ -26,8 +29,8 @@ it('finds http-basic and bearer entries for a host, case-insensitively', functio
 
     $reader = new AuthJson;
 
-    expect($reader->credentialsFor('satis.example.com', $this->dir))->toBe(['type' => 'http-basic', 'username' => 'tom', 'secret' => 'hunter2', 'source' => $this->dir.'/auth.json'])
-        ->and($reader->credentialsFor('repo.packagist.com', $this->dir))->toBe(['type' => 'bearer', 'username' => null, 'secret' => 'tok', 'source' => $this->dir.'/auth.json'])
+    expect($reader->credentialsFor('satis.example.com', $this->dir))->toBe(['type' => 'http-basic', 'username' => 'tom', 'secret' => 'hunter2', 'source' => './auth.json'])
+        ->and($reader->credentialsFor('repo.packagist.com', $this->dir))->toBe(['type' => 'bearer', 'username' => null, 'secret' => 'tok', 'source' => './auth.json'])
         ->and($reader->credentialsFor('unknown.example.com', $this->dir))->toBeNull();
 });
 
@@ -41,5 +44,6 @@ it('prefers COMPOSER_AUTH, then the project, then the global auth.json', functio
     expect($reader->credentialsFor('satis.example.com', $this->dir)['secret'])->toBe('from-env')
         ->and($reader->credentialsFor('satis.example.com', $this->dir)['source'])->toBe('COMPOSER_AUTH')
         ->and($reader->credentialsFor('other.example.com', $this->dir)['secret'])->toBe('project-other')
-        ->and($reader->credentialsFor('global.example.com', $this->dir)['secret'])->toBe('global-only');
+        ->and($reader->credentialsFor('global.example.com', $this->dir)['secret'])->toBe('global-only')
+        ->and($reader->credentialsFor('global.example.com', $this->dir)['source'])->toBe('~/home/auth.json');
 });

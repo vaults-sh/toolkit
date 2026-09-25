@@ -369,7 +369,7 @@ it('waits for the real package total before showing progress', function () {
 
     $this->artisan('deposit')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('Deposited: 2')
+        ->expectsOutputToContain('Deposited 2')
         ->assertExitCode(0);
 });
 
@@ -620,8 +620,8 @@ it('reports private packages separately in the deposit summary', function () {
 
     $this->artisan('deposit')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('Private (served from your team repository): 1')
-        ->expectsOutputToContain('Coverage: 100% of 2 coverable packages.')
+        ->expectsOutputToContain('Private 1 (served from your team repository)')
+        ->expectsOutputToContain('Coverage 100% of 2 coverable packages')
         ->assertExitCode(0);
 });
 
@@ -731,11 +731,11 @@ it('lists every package that did not deposit with its reason and offers credenti
     ]);
 
     $this->artisan('deposit')
-        ->expectsConfirmation('Give Vaults the credentials for satis.dedoc.co from '.realpath($this->workDir).'/auth.json and deposit again?', 'yes')
+        ->expectsConfirmation('Give Vaults the credentials for satis.dedoc.co from ./auth.json and deposit again?', 'yes')
         ->expectsConfirmation('Add it now?', 'no')
         ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  needs credentials for satis.dedoc.co')
         ->expectsOutputToContain('vaults repositories:add satis.dedoc.co')
-        ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet.')
+        ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
         ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
         ->expectsOutputToContain('Run vaults private:link so this project can install them from your private repository.')
@@ -756,7 +756,7 @@ it('exits non-zero when a package failed to deposit even though the run complete
 
     $this->artisan('deposit', ['--no-interaction' => true])
         ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  credentials for satis.dedoc.co were rejected')
-        ->expectsOutputToContain('Update them with: vaults repositories:add satis.dedoc.co')
+        ->expectsOutputToContain('vaults repositories:add satis.dedoc.co (replaces the stored credentials)')
         ->expectsOutputToContain('1 package did not deposit; installs still depend on their original hosts.')
         ->assertExitCode(1);
 });
@@ -820,11 +820,13 @@ it('detects paid repositories in composer.lock before depositing and asks to use
     ]]);
 
     $this->artisan('deposit')
-        ->expectsOutputToContain('composer.lock has 1 package from satis.dedoc.co (dedoc/scramble-pro), and '.realpath($this->workDir).'/auth.json has credentials for it.')
-        ->expectsConfirmation('Let Vaults use those credentials to deposit them privately for your team?', 'yes')
+        ->expectsOutputToContain('Private repositories in composer.lock')
+        ->expectsOutputToContain('satis.dedoc.co  1 package  dedoc/scramble-pro')
+        ->expectsOutputToContain('credentials in ./auth.json (http-basic, tom)')
+        ->expectsConfirmation('Use the satis.dedoc.co credentials?', 'yes')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('Deposited: 2')
+        ->expectsOutputToContain('Deposited 2')
         ->assertExitCode(0);
 
     expect($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')
@@ -846,7 +848,7 @@ it('does not ask again after the run for a repository declined up front', functi
     $this->transport->queueJson(['composer_lock' => '{"packages":[]}', 'repositories' => ['project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]);
 
     $this->artisan('deposit')
-        ->expectsConfirmation('Let Vaults use those credentials to deposit them privately for your team?', 'no')
+        ->expectsConfirmation('Use the satis.dedoc.co credentials?', 'no')
         ->expectsOutputToContain('Skipping satis.dedoc.co. Run vaults repositories:add satis.dedoc.co later')
         ->expectsConfirmation('Add it now?', 'no')
         ->expectsOutputToContain('needs credentials for satis.dedoc.co')

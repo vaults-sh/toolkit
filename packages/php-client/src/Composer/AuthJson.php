@@ -53,7 +53,7 @@ final class AuthJson
         $projectPath = $directory.DIRECTORY_SEPARATOR.'auth.json';
         $globalPath = (new ComposerConfigWriter)->globalAuthPath();
 
-        foreach ([$projectPath, $globalPath] as $path) {
+        foreach ([$projectPath => './auth.json', $globalPath => $this->shorten($globalPath)] as $path => $label) {
             if (! is_file($path)) {
                 continue;
             }
@@ -61,10 +61,21 @@ final class AuthJson
             $decoded = json_decode((string) file_get_contents($path), true);
 
             if (is_array($decoded)) {
-                $sources[$path] = $decoded;
+                $sources[$label] = $decoded;
             }
         }
 
         return $sources;
+    }
+
+    private function shorten(string $path): string
+    {
+        $home = getenv('HOME');
+
+        if (is_string($home) && $home !== '' && str_starts_with($path, rtrim($home, '/').'/')) {
+            return '~/'.substr($path, strlen(rtrim($home, '/')) + 1);
+        }
+
+        return $path;
     }
 }
