@@ -50,8 +50,17 @@ final class PrivateLinkCommand extends VaultsCommand
 
         $name = $input->getOption('name');
 
+        $override = $input->getOption('project');
+
         try {
-            $key = (new PrivateLink($client))->issueKey(is_string($name) && $name !== '' ? $name : PrivateLink::defaultKeyName(), $expires);
+            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
+                ->resolve($this->directory(), is_string($override) ? $override : null, $input->isInteractive());
+
+            if ($projectUuid === null) {
+                return self::FAILURE;
+            }
+
+            $key = (new PrivateLink($client))->issueKey(is_string($name) && $name !== '' ? $name : PrivateLink::defaultKeyName(), $expires, $projectUuid);
         } catch (VaultsException $exception) {
             return $this->reportFailure($exception, $output);
         }

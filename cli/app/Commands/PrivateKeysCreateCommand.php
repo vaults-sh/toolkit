@@ -14,7 +14,7 @@ class PrivateKeysCreateCommand extends Command
 {
     protected $signature = 'private:keys:create
         {name : A label such as "GitHub Actions" or "Client X deploy"}
-        {--project= : Project uuid to group the key under}
+        {--project= : Project uuid the key is bound to (required for third-party private packages)}
         {--package=* : Restrict the key to these private packages (vendor/name)}
         {--expires=365 : Days until the key expires (1-730)}
         {--write : Write the key into this project\'s auth.json instead of printing it}';

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Concerns\ResolvesProject;
 use LaravelZero\Framework\Commands\Command;
 use Vaults\Composer\AuthJson;
 use Vaults\Exception\AuthenticationException;
 use Vaults\Exception\VaultsException;
+use Vaults\Project\ProjectManifest;
 use Vaults\VaultsClient;
 
 use function Laravel\Prompts\confirm;
@@ -17,16 +19,19 @@ use function Laravel\Prompts\text;
 
 class RepositoriesAddCommand extends Command
 {
+    use ResolvesProject;
+
     protected $signature = 'repositories:add
         {host : The repository host, e.g. satis.example.com}
         {--type= : http-basic or bearer}
         {--username= : Username for http-basic}
         {--secret= : Password or token (prefer auth.json or the prompt over passing this on the command line)}
-        {--from-auth : Take the credentials from auth.json without asking}';
+        {--from-auth : Take the credentials from auth.json without asking}
+        {--project= : Project UUID (overrides .vaults.json)}';
 
-    protected $description = 'Give Vaults the credentials for a third-party private Composer repository so its packages can be deposited';
+    protected $description = 'Authorise this project for a third-party private Composer repository by giving Vaults its credentials';
 
-    public function handle(VaultsClient $client, AuthJson $authJson): int
+    public function handle(VaultsClient $client, AuthJson $authJson, ProjectManifest $manifest): int
     {
         $host = strtolower(trim((string) $this->argument('host')));
         $type = $this->option('type');
@@ -66,7 +71,13 @@ class RepositoriesAddCommand extends Command
         }
 
         try {
-            $credential = $client->storeRepositoryCredential($host, $type, (string) $secret, $type === 'http-basic' ? $username : null);
+            $projectUuid = $this->resolveProject($client, $manifest, (string) getcwd());
+
+            if ($projectUuid === null) {
+                return self::FAILURE;
+            }
+
+            $credential = $client->storeRepositoryCredential($projectUuid, $host, $type, (string) $secret, $type === 'http-basic' ? $username : null);
         } catch (AuthenticationException) {
             $this->error('Not authenticated. Run vaults login first.');
 
@@ -77,8 +88,8 @@ class RepositoriesAddCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Saved '.$credential->typeLabel().' credentials for '.$credential->host.'. Vaults will use them to deposit that host\'s packages privately for your team.');
-        $this->line('By saving them you confirm your team is licensed for the packages on this host. Run vaults deposit to pick them up.');
+        $this->info('Saved '.$credential->typeLabel().' credentials for '.$credential->host.' against '.($credential->projectName ?? 'this project').'.');
+        $this->line('By saving them you confirm this project is licensed for the packages on this host. Other projects are never given access through them. Run vaults deposit to pick them up.');
 
         return self::SUCCESS;
     }

@@ -106,7 +106,7 @@ final class DepositCommand extends VaultsCommand
     private function deposit(VaultsClient $client, string $projectUuid, string $lock, string $lockPath, bool $write, OutputInterface $output, string $directory, bool $interactive, bool $retried = false): int
     {
         if (! $retried) {
-            $this->offerPrivateRepositories($client, $lock, $directory, $output, $interactive);
+            $this->offerPrivateRepositories($client, $projectUuid, $lock, $directory, $output, $interactive);
         }
 
         $run = $client->deposit($projectUuid, $lock);
@@ -135,20 +135,26 @@ final class DepositCommand extends VaultsCommand
             return self::FAILURE;
         }
 
-        if (! $retried && $this->offerCredentials($client, $run, $directory, $output, $interactive)) {
+        if (! $retried && $this->offerCredentials($client, $projectUuid, $run, $directory, $output, $interactive)) {
             return $this->deposit($client, $projectUuid, $lock, $lockPath, $write, $output, $directory, $interactive, retried: true);
         }
 
         $rewritten = $client->getRewrittenLock($run->uuid);
 
         $this->finishWiring($rewritten->projectRepository, $directory, $output, $interactive);
-        $this->offerPrivateWiring($client, $run, $rewritten, $directory, $output, $interactive);
+        $this->offerPrivateWiring($client, $projectUuid, $run, $rewritten, $directory, $output, $interactive);
 
         if ($write) {
             file_put_contents($lockPath, (new LockContentHash)->refresh($rewritten->composerLock, $directory.DIRECTORY_SEPARATOR.'composer.json'));
             $output->writeln('');
             $output->writeln('<fg=green>✓</> composer.lock now installs from Vaults. Nothing to reinstall here.');
-            $output->writeln('<fg=gray>Commit composer.json, composer.lock and .vaults.json. Installing needs no Vaults token, in CI or anywhere else.</>');
+            $output->writeln('<fg=gray>Commit composer.json, composer.lock and .vaults.json.</>');
+
+            if ($run->depositedPrivateItems() !== []) {
+                $output->writeln('<fg=gray>CI and servers need a private access key for '.($rewritten->privateRepository['url'] ?? 'your private repository').' in auth.json or COMPOSER_AUTH: composer vaults:private:keys:create "CI".</>');
+            } else {
+                $output->writeln('<fg=gray>Installing needs no Vaults token, in CI or anywhere else.</>');
+            }
         } else {
             $output->writeln('');
             $output->writeln('Run <options=bold>composer vaults:deposit --write</> to pin composer.lock to Vaults.');
@@ -164,7 +170,7 @@ final class DepositCommand extends VaultsCommand
         return self::SUCCESS;
     }
 
-    private function offerPrivateRepositories(VaultsClient $client, string $lock, string $directory, OutputInterface $output, bool $interactive): void
+    private function offerPrivateRepositories(VaultsClient $client, string $projectUuid, string $lock, string $directory, OutputInterface $output, bool $interactive): void
     {
         if (! $interactive) {
             return;
@@ -177,12 +183,12 @@ final class DepositCommand extends VaultsCommand
         }
 
         try {
-            $teamCredentials = $client->listRepositoryCredentials();
+            $projectCredentials = $client->listRepositoryCredentials($projectUuid);
         } catch (VaultsException) {
-            $teamCredentials = [];
+            $projectCredentials = [];
         }
 
-        $repositories = $detector->detect($lock, $directory, $teamCredentials);
+        $repositories = $detector->detect($lock, $directory, $projectCredentials);
 
         foreach ((new DepositReport('composer vaults:'))->privateRepositories($repositories) as $line) {
             $output->writeln($line);
@@ -197,15 +203,15 @@ final class DepositCommand extends VaultsCommand
             }
 
             try {
-                $client->storeRepositoryCredential($repository['host'], $repository['credentials']['type'], $repository['credentials']['secret'], $repository['credentials']['username']);
-                $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$repository['host'].'</>. Its packages will be deposited privately for your team.');
+                $client->storeRepositoryCredential($projectUuid, $repository['host'], $repository['credentials']['type'], $repository['credentials']['secret'], $repository['credentials']['username']);
+                $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$repository['host'].'</> against this project.');
             } catch (VaultsException $exception) {
                 $output->writeln('<error>'.$exception->getMessage().'</error>');
             }
         }
     }
 
-    private function offerCredentials(VaultsClient $client, DepositRun $run, string $directory, OutputInterface $output, bool $interactive): bool
+    private function offerCredentials(VaultsClient $client, string $projectUuid, DepositRun $run, string $directory, OutputInterface $output, bool $interactive): bool
     {
         if (! $interactive) {
             return false;
@@ -224,26 +230,26 @@ final class DepositCommand extends VaultsCommand
                 continue;
             }
 
-            if (! $this->resolveIO()->askConfirmation('Give Vaults the credentials for '.$host.' from '.$found['source'].' and deposit again? [Y/n] ')) {
+            if (! $this->resolveIO()->askConfirmation('Authorise this project with the '.$host.' credentials from '.$found['source'].' and deposit again? [Y/n] ')) {
                 continue;
             }
 
             try {
-                $client->storeRepositoryCredential($host, $found['type'], $found['secret'], $found['username']);
+                $client->storeRepositoryCredential($projectUuid, $host, $found['type'], $found['secret'], $found['username']);
             } catch (VaultsException $exception) {
                 $output->writeln('<error>'.$exception->getMessage().'</error>');
 
                 continue;
             }
 
-            $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$host.'</>. Its packages will be deposited privately for your team.');
+            $output->writeln('<fg=green>✓</> Saved credentials for <fg=cyan>'.$host.'</> against this project.');
             $uploaded = true;
         }
 
         return $uploaded;
     }
 
-    private function offerPrivateWiring(VaultsClient $client, DepositRun $run, RewrittenLock $rewritten, string $directory, OutputInterface $output, bool $interactive): void
+    private function offerPrivateWiring(VaultsClient $client, string $projectUuid, DepositRun $run, RewrittenLock $rewritten, string $directory, OutputInterface $output, bool $interactive): void
     {
         $private = $run->depositedPrivateItems();
 
@@ -253,8 +259,8 @@ final class DepositCommand extends VaultsCommand
 
         $output->writeln('');
         $output->writeln(count($private) === 1
-            ? '<fg=cyan>'.$private[0]->package.'</> was deposited as a private package for your team.'
-            : '<fg=cyan>'.count($private).' packages</> were deposited as private packages for your team.');
+            ? '<fg=cyan>'.$private[0]->package.'</> is authorised for this project and served from your private repository.'
+            : '<fg=cyan>'.count($private).' packages</> are authorised for this project and served from your private repository.');
 
         if (! $interactive || ! $this->resolveIO()->askConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json) [Y/n] ')) {
             $output->writeln('<fg=gray>→</> Run <options=bold>composer vaults:private:link</> when you are ready to install them from Vaults.');
@@ -263,7 +269,7 @@ final class DepositCommand extends VaultsCommand
         }
 
         try {
-            $wired = (new PrivateLink($client))->wire($this->writer(), $directory, $directory.DIRECTORY_SEPARATOR.'auth.json', PrivateLink::defaultKeyName(), 365);
+            $wired = (new PrivateLink($client))->wire($this->writer(), $directory, $directory.DIRECTORY_SEPARATOR.'auth.json', PrivateLink::defaultKeyName(), 365, $projectUuid);
         } catch (VaultsException|RuntimeException $exception) {
             $output->writeln('<error>'.$exception->getMessage().'</error>');
 

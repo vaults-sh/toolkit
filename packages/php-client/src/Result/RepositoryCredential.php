@@ -13,6 +13,8 @@ final readonly class RepositoryCredential
         public ?string $username,
         public ?string $lastUsedAt,
         public ?string $createdAt,
+        public ?string $projectUuid = null,
+        public ?string $projectName = null,
     ) {}
 
     /**
@@ -20,6 +22,8 @@ final readonly class RepositoryCredential
      */
     public static function fromArray(array $data): self
     {
+        $project = is_array($data['project'] ?? null) ? $data['project'] : [];
+
         return new self(
             (string) ($data['uuid'] ?? ''),
             (string) ($data['host'] ?? ''),
@@ -27,6 +31,8 @@ final readonly class RepositoryCredential
             is_string($data['username'] ?? null) ? $data['username'] : null,
             is_string($data['last_used_at'] ?? null) ? $data['last_used_at'] : null,
             is_string($data['created_at'] ?? null) ? $data['created_at'] : null,
+            is_string($project['uuid'] ?? null) ? $project['uuid'] : null,
+            is_string($project['name'] ?? null) ? $project['name'] : null,
         );
     }
 

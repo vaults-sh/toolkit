@@ -49,20 +49,16 @@ composer vaults:private:keys:revoke <key-uuid>
 ## Third-party private Composer repositories
 
 ```bash
-composer vaults:repositories                 # hosts your team has given Vaults credentials for
+composer vaults:repositories [--all]         # hosts this project has given Vaults credentials for
 composer vaults:repositories:add <host> [--from-auth] [--type=http-basic|bearer] [--username=...]
 composer vaults:repositories:remove <host>
 ```
 
-Before a deposit starts, the plugin reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that your team has not given Vaults yet, asks whether to use them; say yes and those packages deposit privately in the same run. Anything that still cannot deposit is listed afterwards with its reason; a third-party private Composer repository (a vendor's Satis, Private Packagist) shows as `needs credentials for <host>`. Vaults uses them only to download that host's packages for your team, stores the result as private packages served from your private repository, and never shares them with other teams. The deposit offers to wire that repository and a key into the project straight away; `composer vaults:private:link` does the same on another machine. Every command that edits `composer.json` refreshes the lock's content hash, so `composer install` never warns about a stale lock because of Vaults. Storing credentials confirms your team holds the licence for those packages.
+A third-party private package is authorised **per project**. One project's vendor login is never used for another, and a project can only install such a package once its own credentials have been accepted by the vendor.
 
-`private:link` creates a revocable key named after your machine, valid for a year by default; re-running it rotates the key. For CI or a client project, create a dedicated key with `private:keys:create` and put it in `COMPOSER_AUTH` or the consuming project's `auth.json`. Never commit `auth.json`.
+Before a deposit starts, the plugin reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that *this project* has not given Vaults yet, asks whether to use them. Say yes and the project is authorised in the same run. If another project in your team already mirrored that version, Vaults does not download it again: it checks your credentials against the vendor with a single request and links the project to the stored copy. If the vendor refuses, so does Vaults. Anything that still cannot deposit is listed afterwards with its reason.
 
-After wiring private access it offers to route public packages through this project's Vaults repository too, depositing first if the repository does not exist yet. That repository serves only the versions Vaults verified for your lockfile. `--with-public` and `--no-public` skip the question.
-
-`composer vaults:login` and `composer vaults:open` open your browser for you. Set `VAULTS_NO_BROWSER=1` to stop that on a headless or remote machine; the URL is always printed as well.
-
-Credentials are stored once per machine with one entry per team. Log in once per team you work with; each project's committed `.vaults.json` records its team, so every command in that directory uses the right one automatically.
+Installs are scoped the same way. `composer vaults:private:link` creates a key bound to the linked project, and the private edge serves a third-party package only to a key whose project is authorised for it. CI needs a key created for that project: `composer vaults:private:keys:create "CI" --project=<uuid>`. Every command that edits `composer.json` refreshes the lock's content hash, so `composer install` never warns about a stale lock because of Vaults.
 
 ## Automatic deposits after `composer update`
 

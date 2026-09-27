@@ -86,6 +86,7 @@ beforeEach(function () {
 });
 
 it('registers every command under the vaults namespace with deposit kept as an alias', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $plugin = new VaultsPlugin;
     $provider = new (array_values($plugin->getCapabilities())[0]);
     $commands = $provider->getCommands();
@@ -252,7 +253,7 @@ it('opens the dashboard and says when the directory is unlinked', function () {
 function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-09-08T00:00:00Z', array $existing = []): void
 {
     $transport->queueJson([
-        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => $expiresAt, 'created_at' => null],
+        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'packages' => null, 'expires_at' => $expiresAt, 'created_at' => null],
         'token' => $token,
         'host' => 'private.vaults-edge.net',
         'repository_url' => 'https://private.vaults-edge.net',
@@ -261,8 +262,9 @@ function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-0
 }
 
 it('links private packages by creating a named key, rotating the previous one, and writing auth.json', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     queueCreatedKey($this->transport, 'vault-key-xyz', existing: [
-        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => null, 'created_at' => null],
+        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'packages' => null, 'expires_at' => null, 'created_at' => null],
         ['uuid' => 'key-ci', 'name' => 'GitHub Actions', 'project' => null, 'packages' => null, 'expires_at' => null, 'created_at' => null],
     ]);
     $this->transport->queueJson([], 204);
@@ -278,13 +280,14 @@ it('links private packages by creating a named key, rotating the previous one, a
         ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
         ->and($tester->getDisplay())->toContain('Created private access key "tom-macbook"')
         ->and($tester->getDisplay())->toContain('Do not commit auth.json')
-        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90])
+        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90, 'project' => 'project-uuid'])
         ->and($requests[2]->method)->toBe('DELETE')
         ->and($requests[2]->url)->toEndWith('/private-keys/key-old')
         ->and($requests)->toHaveCount(3);
 });
 
 it('writes the private key to the global auth.json with --global', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $composerHome = $this->workDir.'/composer-home';
     putenv('COMPOSER_HOME='.$composerHome);
     queueCreatedKey($this->transport, 'global-key', null);
@@ -379,6 +382,7 @@ it('deposits automatically when the public repository is not published yet', fun
 });
 
 it('skips the public repository entirely with --no-public', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     queueCreatedKey($this->transport, 'vault-key-xyz');
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
@@ -388,6 +392,7 @@ it('skips the public repository entirely with --no-public', function () {
 });
 
 it('fails private commands when not authenticated and non-interactive', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $this->store->clear();
 
     $tester = ($this->tester)(PrivateLinkCommand::class);
@@ -513,6 +518,7 @@ it('never asks about the public mirror when the repository is already configured
 });
 
 it('lists, adds from auth.json, and removes repository credentials', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/auth.json', json_encode(['http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']]]));
 
     $this->transport->queueJson(['data' => []]);
@@ -534,7 +540,7 @@ it('lists, adds from auth.json, and removes repository credentials', function ()
 
     expect($request->method)->toBe('POST')
         ->and($request->url)->toBe('https://vaults.test/api/v1/repository-credentials')
-        ->and(json_decode((string) $request->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+        ->and(json_decode((string) $request->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 
     $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => '2026-09-25T10:00:00Z']]]);
 
@@ -556,6 +562,7 @@ it('lists, adds from auth.json, and removes repository credentials', function ()
 });
 
 it('refuses to add credentials non-interactively when auth.json has none', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $tester = ($this->tester)(RepositoriesAddCommand::class);
 
     expect($tester->execute(['host' => 'satis.example.com'], ['interactive' => false]))->toBe(1)
@@ -564,5 +571,5 @@ it('refuses to add credentials non-interactively when auth.json has none', funct
     $this->transport->queueJson(['data' => ['uuid' => 'c2', 'host' => 'satis.example.com', 'type' => 'bearer', 'username' => null]], 201);
 
     expect($tester->execute(['host' => 'satis.example.com', '--type' => 'bearer', '--secret' => 'tok'], ['interactive' => false]))->toBe(0)
-        ->and(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['host' => 'satis.example.com', 'type' => 'bearer', 'secret' => 'tok']);
+        ->and(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.example.com', 'type' => 'bearer', 'secret' => 'tok']);
 });

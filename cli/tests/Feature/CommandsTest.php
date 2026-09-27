@@ -402,7 +402,7 @@ it('refreshes the lock content hash to match the wired composer.json', function 
 function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-09-08T00:00:00Z', array $existing = []): void
 {
     $transport->queueJson([
-        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => $expiresAt],
+        'data' => ['uuid' => 'key-new', 'name' => 'tom-macbook', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'packages' => null, 'expires_at' => $expiresAt],
         'token' => $token,
         'host' => 'private.vaults-edge.net',
         'repository_url' => 'https://private.vaults-edge.net',
@@ -411,6 +411,7 @@ function queueCreatedKey($transport, string $token, ?string $expiresAt = '2027-0
 }
 
 it('links a project for private hosting by creating a named key and writing it to auth.json', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', json_encode([
         'repositories' => [
             ['type' => 'composer', 'url' => 'https://private.vaults-edge.net', 'canonical' => false],
@@ -418,7 +419,7 @@ it('links a project for private hosting by creating a named key and writing it t
     ], JSON_PRETTY_PRINT));
 
     queueCreatedKey($this->transport, 'vault-key-xyz', existing: [
-        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => null, 'packages' => null, 'expires_at' => null],
+        ['uuid' => 'key-old', 'name' => 'tom-macbook', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'packages' => null, 'expires_at' => null],
         ['uuid' => 'key-ci', 'name' => 'GitHub Actions', 'project' => null, 'packages' => null, 'expires_at' => null],
     ]);
     $this->transport->queueJson([], 204);
@@ -435,7 +436,7 @@ it('links a project for private hosting by creating a named key and writing it t
 
     expect($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
         ->and($requests[0]->method)->toBe('POST')
-        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90])
+        ->and(json_decode((string) $requests[0]->body, true))->toBe(['name' => 'tom-macbook', 'expires_in_days' => 90, 'project' => 'project-uuid'])
         ->and($requests[1]->method)->toBe('GET')
         ->and($requests[2]->method)->toBe('DELETE')
         ->and($requests[2]->url)->toEndWith('/private-keys/key-old')
@@ -506,6 +507,7 @@ it('deposits automatically when the public repository is not published yet', fun
 });
 
 it('skips the public repository entirely with --no-public', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', '{"repositories":[{"type":"composer","url":"https://private.vaults-edge.net","canonical":false}]}');
     queueCreatedKey($this->transport, 'vault-key-xyz');
 
@@ -515,6 +517,7 @@ it('skips the public repository entirely with --no-public', function () {
 });
 
 it('fails private:link when not authenticated', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $this->transport->queueJson(['message' => 'Unauthenticated.'], 401);
 
     $this->artisan('private:link')
@@ -523,6 +526,7 @@ it('fails private:link when not authenticated', function () {
 });
 
 it('writes the private key to the global composer auth.json with --global', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $composerHome = $this->workDir.'/composer-home';
     putenv('COMPOSER_HOME='.$composerHome);
 
@@ -544,6 +548,7 @@ it('writes the private key to the global composer auth.json with --global', func
 });
 
 it('rejects an out-of-range expiry on private:link before calling the api', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $this->artisan('private:link', ['--expires' => '0'])->assertExitCode(1);
 
     expect($this->transport->requests)->toBe([]);
@@ -731,18 +736,18 @@ it('lists every package that did not deposit with its reason and offers credenti
     ]);
 
     $this->artisan('deposit')
-        ->expectsConfirmation('Give Vaults the credentials for satis.dedoc.co from ./auth.json and deposit again?', 'yes')
+        ->expectsConfirmation('Authorise this project with the satis.dedoc.co credentials from ./auth.json and deposit again?', 'yes')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  needs credentials for satis.dedoc.co')
+        ->expectsOutputToContain('dedoc/scramble-pro v0.9.15  this project needs its own credentials for satis.dedoc.co')
         ->expectsOutputToContain('vaults repositories:add satis.dedoc.co')
         ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
-        ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
+        ->expectsOutputToContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
         ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'no')
         ->expectsOutputToContain('Run vaults private:link when you are ready')
         ->assertExitCode(0);
 
-    expect(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+    expect(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 });
 
 it('exits non-zero when a package failed to deposit even though the run completed', function () {
@@ -763,6 +768,7 @@ it('exits non-zero when a package failed to deposit even though the run complete
 });
 
 it('lists, adds from auth.json, and removes repository credentials', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/auth.json', json_encode(['bearer' => ['repo.packagist.com' => 'tok-123']]));
 
     $this->transport->queueJson(['data' => []]);
@@ -777,25 +783,27 @@ it('lists, adds from auth.json, and removes repository credentials', function ()
         ->expectsOutputToContain('Saved bearer credentials for repo.packagist.com')
         ->assertExitCode(0);
 
-    expect(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok-123']);
+    expect(json_decode((string) $this->transport->lastRequest()->body, true))->toBe(['project' => 'project-uuid', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok-123']);
 
-    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
 
     $this->artisan('repositories')
-        ->expectsTable(['Host', 'Type', 'Last used'], [['repo.packagist.com', 'bearer', 'never']])
+        ->expectsTable(['Host', 'Project', 'Type', 'Last used'], [['repo.packagist.com', 'Shop', 'bearer', 'never']])
         ->assertExitCode(0);
 
-    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
+    $this->transport->queueJson(['data' => [['uuid' => 'c1', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null, 'last_used_at' => null]]]);
     $this->transport->queueJson([], 204);
 
     $this->artisan('repositories:remove', ['host' => 'repo.packagist.com'])
         ->expectsOutputToContain('Removed the credentials for repo.packagist.com')
         ->assertExitCode(0);
 
-    expect($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repository-credentials/c1');
+    expect($this->transport->lastRequest()->url)->toBe('https://vaults.test/api/v1/repository-credentials/c1')
+        ->and($this->transport->requests[count($this->transport->requests) - 2]->url)->toBe('https://vaults.test/api/v1/repository-credentials?project=project-uuid');
 });
 
 it('refuses repositories:add non-interactively without credentials to use', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     $this->artisan('repositories:add', ['host' => 'satis.example.com', '--no-interaction' => true])
         ->expectsOutputToContain('No credentials for satis.example.com in auth.json')
         ->assertExitCode(1);
@@ -831,8 +839,8 @@ it('detects paid repositories in composer.lock before depositing and asks to use
         ->expectsOutputToContain('Deposited 2')
         ->assertExitCode(0);
 
-    expect($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')
-        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+    expect($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials?project=project-uuid')
+        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 });
 
 it('does not ask again after the run for a repository declined up front', function () {
@@ -853,7 +861,7 @@ it('does not ask again after the run for a repository declined up front', functi
         ->expectsConfirmation('Use the satis.dedoc.co credentials?', 'no')
         ->expectsOutputToContain('Skipping satis.dedoc.co. Run vaults repositories:add satis.dedoc.co later')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsOutputToContain('needs credentials for satis.dedoc.co')
+        ->expectsOutputToContain('this project needs its own credentials for satis.dedoc.co')
         ->assertExitCode(1);
 
     expect(count($this->transport->requests))->toBe(4);
@@ -888,10 +896,11 @@ it('wires the private repository and key from the deposit when private packages 
     queueCreatedKey($this->transport, 'vault-key-xyz');
 
     $this->artisan('deposit', ['--write' => true])
-        ->expectsOutputToContain('dedoc/scramble-pro was deposited as a private package for your team.')
+        ->expectsOutputToContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
         ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'yes')
         ->expectsOutputToContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->expectsOutputToContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
+        ->expectsOutputToContain('CI and servers need a private access key for https://private.vaults-edge.net')
         ->assertExitCode(0);
 
     $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);
@@ -904,6 +913,7 @@ it('wires the private repository and key from the deposit when private packages 
 });
 
 it('keeps composer.lock in sync when private:link edits composer.json', function () {
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
     file_put_contents($this->workDir.'/composer.json', json_encode(['name' => 'acme/app']));
     file_put_contents($this->workDir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
     queueCreatedKey($this->transport, 'vault-key-xyz');

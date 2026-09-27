@@ -44,7 +44,13 @@ class PrivateLinkCommand extends Command
         $name = $this->option('name');
 
         try {
-            $key = (new PrivateLink($client))->issueKey(is_string($name) && $name !== '' ? $name : PrivateLink::defaultKeyName(), $expires);
+            $projectUuid = $this->resolveProject($client, $manifest, $directory);
+
+            if ($projectUuid === null) {
+                return self::FAILURE;
+            }
+
+            $key = (new PrivateLink($client))->issueKey(is_string($name) && $name !== '' ? $name : PrivateLink::defaultKeyName(), $expires, $projectUuid);
         } catch (AuthenticationException) {
             $this->error('Not authenticated. Run vaults login first.');
 

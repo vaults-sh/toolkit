@@ -64,7 +64,7 @@ final readonly class DepositReport
         }
 
         $lines[] = '';
-        $lines[] = 'Vaults can use these credentials to deposit those packages privately for your team.';
+        $lines[] = 'Vaults can use these credentials to authorise this project for those packages. Other projects are never given access through them.';
 
         return $lines;
     }
@@ -135,7 +135,7 @@ final readonly class DepositReport
         $hostTag = '<fg=cyan>'.$host.'</>';
 
         $lines = match ($reason) {
-            'credentials_required' => $this->packages($items, 'red', 'needs credentials for '.$hostTag),
+            'credentials_required' => $this->packages($items, 'red', 'this project needs its own credentials for '.$hostTag),
             'credentials_rejected' => $this->packages($items, 'red', 'credentials for '.$hostTag.' were rejected'),
             'private_repository' => $this->packages($items, 'red', 'private repository, not hosted on Vaults yet'),
             'private_served_from_team' => [$this->count($items, 'cyan', 'private package', 'private packages').' served from your team repository, not counted against coverage'],
@@ -146,7 +146,7 @@ final readonly class DepositReport
         };
 
         $hint = match ($reason) {
-            'credentials_required' => '<fg=gray>→</> '.$this->commandPrefix.'repositories:add '.$host.' <fg=gray>(uses the credentials in your auth.json)</>',
+            'credentials_required' => '<fg=gray>→</> '.$this->commandPrefix.'repositories:add '.$host.' <fg=gray>(uses the credentials in your auth.json, for this project only)</>',
             'credentials_rejected' => '<fg=gray>→</> '.$this->commandPrefix.'repositories:add '.$host.' <fg=gray>(replaces the stored credentials)</>',
             'private_repository' => '<fg=gray>→</> Connect the repository under Team settings › Sources, or run '.$this->commandPrefix.'open',
             default => null,

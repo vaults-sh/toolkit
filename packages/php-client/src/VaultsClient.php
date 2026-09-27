@@ -173,9 +173,9 @@ final class VaultsClient
     /**
      * @return list<RepositoryCredential>
      */
-    public function listRepositoryCredentials(): array
+    public function listRepositoryCredentials(?string $projectUuid = null): array
     {
-        $response = $this->send('GET', '/api/v1/repository-credentials');
+        $response = $this->send('GET', '/api/v1/repository-credentials'.($projectUuid === null ? '' : '?project='.rawurlencode($projectUuid)));
         $data = $this->decodeEnvelope($response);
 
         return array_values(array_map(
@@ -184,9 +184,9 @@ final class VaultsClient
         ));
     }
 
-    public function storeRepositoryCredential(string $host, string $type, string $secret, ?string $username = null): RepositoryCredential
+    public function storeRepositoryCredential(string $projectUuid, string $host, string $type, string $secret, ?string $username = null): RepositoryCredential
     {
-        $payload = ['host' => $host, 'type' => $type, 'secret' => $secret];
+        $payload = ['project' => $projectUuid, 'host' => $host, 'type' => $type, 'secret' => $secret];
 
         if ($username !== null) {
             $payload['username'] = $username;

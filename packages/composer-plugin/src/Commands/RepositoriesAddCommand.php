@@ -9,20 +9,23 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Vaults\Composer\AuthJson;
+use Vaults\ComposerPlugin\Support\ProjectLinker;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
+use Vaults\Project\ProjectManifest;
 
 final class RepositoriesAddCommand extends VaultsCommand
 {
     protected function configure(): void
     {
         $this->setName('vaults:repositories:add')
-            ->setDescription('Give Vaults the credentials for a third-party private Composer repository so its packages can be deposited')
+            ->setDescription('Authorise this project for a third-party private Composer repository by giving Vaults its credentials')
             ->addArgument('host', InputArgument::REQUIRED, 'The repository host, e.g. satis.example.com')
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'http-basic or bearer')
             ->addOption('username', null, InputOption::VALUE_REQUIRED, 'Username for http-basic')
             ->addOption('secret', null, InputOption::VALUE_REQUIRED, 'Password or token (prefer auth.json or the prompt over passing this on the command line)')
-            ->addOption('from-auth', null, InputOption::VALUE_NONE, 'Take the credentials from auth.json without asking');
+            ->addOption('from-auth', null, InputOption::VALUE_NONE, 'Take the credentials from auth.json without asking')
+            ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project UUID (overrides .vaults.json)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -78,14 +81,23 @@ final class RepositoriesAddCommand extends VaultsCommand
             return self::FAILURE;
         }
 
+        $override = $input->getOption('project');
+
         try {
-            $credential = $client->storeRepositoryCredential($host, $type, $secret, $type === 'http-basic' ? $username : null);
+            $projectUuid = (new ProjectLinker($client, new ProjectManifest, $this->resolveIO(), $output, $this->activeTeam?->uuid))
+                ->resolve($this->directory(), is_string($override) ? $override : null, $interactive);
+
+            if ($projectUuid === null) {
+                return self::FAILURE;
+            }
+
+            $credential = $client->storeRepositoryCredential($projectUuid, $host, $type, $secret, $type === 'http-basic' ? $username : null);
         } catch (VaultsException $exception) {
             return $this->reportFailure($exception, $output);
         }
 
-        $output->writeln('<info>Saved '.$credential->typeLabel().' credentials for '.$credential->host.'. Vaults will use them to deposit that host\'s packages privately for your team.</info>');
-        $output->writeln('By saving them you confirm your team is licensed for the packages on this host. Run "composer vaults:deposit" to pick them up.');
+        $output->writeln('<info>Saved '.$credential->typeLabel().' credentials for '.$credential->host.' against '.($credential->projectName ?? 'this project').'.</info>');
+        $output->writeln('By saving them you confirm this project is licensed for the packages on this host. Other projects are never given access through them. Run "composer vaults:deposit" to pick them up.');
 
         return self::SUCCESS;
     }

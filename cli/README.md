@@ -34,7 +34,7 @@ Every command also checks for a newer release at most once a day and prints a on
 | `vaults private:keys` | List private access keys. |
 | `vaults private:keys:create` | Create a CI or client key; `--package`, `--expires`, `--write`. |
 | `vaults private:keys:revoke` | Revoke a key. |
-| `vaults repositories` | Third-party private Composer repositories your team has given Vaults credentials for. |
+| `vaults repositories` | Third-party private Composer repositories this project has given Vaults credentials for; `--all` for the whole team. |
 | `vaults repositories:add <host>` | Store credentials for a host from `auth.json` or a prompt; `--from-auth`, `--type`, `--username`. |
 | `vaults repositories:remove <host>` | Remove a host's credentials. |
 | `vaults self-update` | Replace the running PHAR with the latest release. |
@@ -54,9 +54,11 @@ Credentials are stored once per machine, one entry per team. Run `vaults login` 
 
 ## Third-party private Composer repositories
 
-Before a deposit starts, `vaults deposit` reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that your team has not given Vaults yet, asks whether to use them. Say yes and those packages deposit privately in the same run. Anything that still cannot deposit is listed afterwards with its reason; a third-party private Composer repository such as a vendor's Satis or Private Packagist shows as `needs credentials for <host>`. You can also run `vaults repositories:add <host>` at any time, or add them under Team settings → Repositories.
+A third-party private package is authorised **per project**. One project's vendor login is never used for another, and a project can only install such a package once its own credentials have been accepted by the vendor.
 
-Vaults uses those credentials only to download that host's packages on your team's behalf. The packages are stored as private packages, never on the public mirror, and served only to your team from its private repository. When a deposit stores private packages it offers to wire that repository and a key into the project there and then, so `vaults private:link` is only needed on other machines or in CI. Every command that edits `composer.json` also refreshes the lock's content hash, so `composer install` never warns about a stale lock because of Vaults. Storing credentials confirms your team holds the licence for those packages; they cannot be shared with other teams. Vendors that meter installs still receive Composer's install notifications.
+Before a deposit starts, `vaults deposit` reads `composer.lock` and, for every host you already hold credentials for in `auth.json` or `COMPOSER_AUTH` that *this project* has not given Vaults yet, asks whether to use them. Say yes and the project is authorised in the same run. If another project in your team already mirrored that version, Vaults does not download it again: it checks your credentials against the vendor with a single request and links the project to the stored copy. If the vendor refuses, so does Vaults. Anything that still cannot deposit is listed afterwards with its reason.
+
+Installs are scoped the same way. `vaults private:link` creates a key bound to the linked project, and the private edge serves a third-party package only to a key whose project is authorised for it. CI needs a key created for that project: `vaults private:keys:create "CI" --project=<uuid>`. Every command that edits `composer.json` refreshes the lock's content hash, so `composer install` never warns about a stale lock because of Vaults.
 
 ## Development
 

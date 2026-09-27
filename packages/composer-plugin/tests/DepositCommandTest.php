@@ -345,14 +345,14 @@ it('lists every package that did not deposit with its reason and offers credenti
 
     expect($exit)->toBe(0)
         ->and($display)->toContain('Not deposited')
-        ->and($display)->toContain('dedoc/scramble-pro v0.9.15  needs credentials for satis.dedoc.co')
+        ->and($display)->toContain('dedoc/scramble-pro v0.9.15  this project needs its own credentials for satis.dedoc.co')
         ->and($display)->toContain('composer vaults:repositories:add satis.dedoc.co')
         ->and($display)->toContain('1 local path dependency skipped')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
-        ->and($display)->toContain('dedoc/scramble-pro was deposited as a private package for your team.')
+        ->and($display)->toContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
         ->and($display)->toContain('Run composer vaults:private:link when you are ready')
-        ->and($this->io->questions[0])->toContain('Give Vaults the credentials for satis.dedoc.co from ./auth.json and deposit again?')
-        ->and(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
+        ->and($this->io->questions[0])->toContain('Authorise this project with the satis.dedoc.co credentials from ./auth.json and deposit again?')
+        ->and(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
 });
 
 it('exits non-zero when a package failed to deposit even though the run completed', function () {
@@ -404,8 +404,8 @@ it('detects paid repositories in composer.lock before depositing and asks to use
         ->and($this->io->questions[0])->toBe('Use the satis.dedoc.co credentials? [Y/n] ')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
         ->and($display)->toContain('Run composer vaults:private:link when you are ready')
-        ->and($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials')
-        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['host' => 'satis.dedoc.co', 'type' => 'bearer', 'secret' => 'tok']);
+        ->and($this->transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials?project=project-uuid')
+        ->and(json_decode((string) $this->transport->requests[1]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'bearer', 'secret' => 'tok']);
 });
 
 it('skips the up-front question when the team already holds the credentials', function () {
@@ -483,6 +483,7 @@ it('wires the private repository and key from the deposit when private packages 
         ->and($this->io->questions)->toBe(['Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json) [Y/n] '])
         ->and($display)->toContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->and($display)->toContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
+        ->and($display)->toContain('CI and servers need a private access key for https://private.vaults-edge.net')
         ->and($writer->privateUrl)->toBe('https://private.vaults-edge.net')
         ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
         ->and($lock)->toContain('"rewritten": true')

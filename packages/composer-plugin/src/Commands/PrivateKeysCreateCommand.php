@@ -18,7 +18,7 @@ final class PrivateKeysCreateCommand extends VaultsCommand
         $this->setName('vaults:private:keys:create')
             ->setDescription('Create a long-lived, revocable private access key for CI or a client project')
             ->addArgument('name', InputArgument::REQUIRED, 'A label such as "GitHub Actions" or "Client X deploy"')
-            ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project uuid to group the key under')
+            ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project uuid the key is bound to (required for third-party private packages)')
             ->addOption('package', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Restrict the key to these private packages (vendor/name)', [])
             ->addOption('expires', null, InputOption::VALUE_REQUIRED, 'Days until the key expires (1-730)', '365')
             ->addOption('write', null, InputOption::VALUE_NONE, 'Write the key into this project\'s auth.json instead of printing it');

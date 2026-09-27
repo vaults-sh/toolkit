@@ -231,23 +231,25 @@ it('parses item reasons and derives the hosts that need credentials', function (
 
 it('lists, stores, and deletes repository credentials', function () {
     $transport = new FakeTransport;
-    $transport->queueJson(['data' => [['uuid' => 'c1', 'host' => 'satis.example.com', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => null, 'created_at' => '2026-09-25T00:00:00Z']]]);
+    $transport->queueJson(['data' => [['uuid' => 'c1', 'project' => ['uuid' => 'project-uuid', 'name' => 'Shop'], 'host' => 'satis.example.com', 'type' => 'http-basic', 'username' => 'tom', 'last_used_at' => null, 'created_at' => '2026-09-25T00:00:00Z']]]);
     $transport->queueJson(['data' => ['uuid' => 'c2', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'username' => null]], 201);
     $transport->queueJson([], 204);
 
     $client = fakeClient($transport);
 
-    $credentials = $client->listRepositoryCredentials();
+    $credentials = $client->listRepositoryCredentials('project-uuid');
 
     expect($credentials)->toHaveCount(1)
-        ->and($credentials[0]->typeLabel())->toBe('http-basic (tom)');
+        ->and($credentials[0]->typeLabel())->toBe('http-basic (tom)')
+        ->and($credentials[0]->projectName)->toBe('Shop')
+        ->and($transport->requests[0]->url)->toBe('https://vaults.test/api/v1/repository-credentials?project=project-uuid');
 
-    $stored = $client->storeRepositoryCredential('repo.packagist.com', 'bearer', 'tok');
+    $stored = $client->storeRepositoryCredential('project-uuid', 'repo.packagist.com', 'bearer', 'tok');
 
     expect($stored->uuid)->toBe('c2')
         ->and($stored->typeLabel())->toBe('bearer')
         ->and($transport->requests[1]->method)->toBe('POST')
-        ->and(json_decode((string) $transport->requests[1]->body, true))->toBe(['host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok']);
+        ->and(json_decode((string) $transport->requests[1]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'repo.packagist.com', 'type' => 'bearer', 'secret' => 'tok']);
 
     $client->deleteRepositoryCredential('c2');
 

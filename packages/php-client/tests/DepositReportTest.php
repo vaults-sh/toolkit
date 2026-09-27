@@ -50,9 +50,9 @@ it('groups problems by reason, collapses noisy groups, and attaches the matching
     $lines = plain((new DepositReport('composer vaults:'))->problems(reportRun($items, failed: 5, skipped: 14, private: 1)));
 
     expect($lines)->toContain('Not deposited')
-        ->and($lines)->toContain('  ✗ a/one v1  needs credentials for satis.a.test')
-        ->and($lines)->toContain('  ✗ a/two v2  needs credentials for satis.a.test')
-        ->and($lines)->toContain('    → composer vaults:repositories:add satis.a.test (uses the credentials in your auth.json)')
+        ->and($lines)->toContain('  ✗ a/one v1  this project needs its own credentials for satis.a.test')
+        ->and($lines)->toContain('  ✗ a/two v2  this project needs its own credentials for satis.a.test')
+        ->and($lines)->toContain('    → composer vaults:repositories:add satis.a.test (uses the credentials in your auth.json, for this project only)')
         ->and($lines)->toContain('  ✗ b/one v1  credentials for satis.b.test were rejected')
         ->and($lines)->toContain('    → composer vaults:repositories:add satis.b.test (replaces the stored credentials)')
         ->and($lines)->toContain('  ✗ c/secret v1  private repository, not hosted on Vaults yet')
@@ -109,6 +109,6 @@ it('aligns detected private repositories into columns and pads long package list
             '  repo.packagist.com  4 packages  a/b, c/d, e/f and 1 more',
             '                      credentials in COMPOSER_AUTH (bearer)',
             '',
-            'Vaults can use these credentials to deposit those packages privately for your team.',
+            'Vaults can use these credentials to authorise this project for those packages. Other projects are never given access through them.',
         ]);
 });

@@ -19,6 +19,8 @@ final readonly class PrivateKey
         public ?string $token = null,
         public ?string $host = null,
         public ?string $repositoryUrl = null,
+        public ?string $projectUuid = null,
+        public ?string $owner = null,
     ) {}
 
     /**
@@ -41,6 +43,8 @@ final readonly class PrivateKey
             $token,
             $host,
             $repositoryUrl,
+            is_string($project['uuid'] ?? null) ? $project['uuid'] : null,
+            is_string($data['owner'] ?? null) ? $data['owner'] : null,
         );
     }
 
