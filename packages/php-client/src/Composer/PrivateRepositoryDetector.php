@@ -8,6 +8,8 @@ use Vaults\Result\RepositoryCredential;
 
 final readonly class PrivateRepositoryDetector
 {
+    private const array VaultsDomains = ['vaults-edge.net', 'vaults.sh'];
+
     public function __construct(private AuthJson $authJson = new AuthJson) {}
 
     /**
@@ -34,7 +36,7 @@ final readonly class PrivateRepositoryDetector
                 $name = is_array($entry) ? ($entry['name'] ?? null) : null;
                 $host = is_string($url) ? $this->hostFor($url) : null;
 
-                if ($host === null || ! is_string($name) || in_array($host, $known, true)) {
+                if ($host === null || ! is_string($name) || in_array($host, $known, true) || $this->isVaults($host)) {
                     continue;
                 }
 
@@ -55,6 +57,21 @@ final readonly class PrivateRepositoryDetector
         }
 
         return $detected;
+    }
+
+    private function isVaults(string $host): bool
+    {
+        $name = explode(':', $host, 2)[0];
+
+        foreach (self::VaultsDomains as $domain) {
+            if ($name === $domain || str_ends_with($name, '.'.$domain)) {
+                return true;
+            }
+        }
+
+        $configured = getenv('VAULTS_PRIVATE_URL');
+
+        return is_string($configured) && $configured !== '' && $this->hostFor($configured) === $host;
     }
 
     private function hostFor(string $url): ?string

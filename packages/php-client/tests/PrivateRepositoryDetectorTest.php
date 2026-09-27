@@ -56,3 +56,25 @@ it('ignores hosts the team already gave Vaults, hosts without local credentials,
     expect((new PrivateRepositoryDetector)->detect(detectorLock(), $this->dir, $team))->toBe([])
         ->and((new PrivateRepositoryDetector)->detect('not json', $this->dir, []))->toBe([]);
 });
+
+it('never treats Vaults itself as a third-party repository', function () {
+    file_put_contents($this->dir.'/auth.json', json_encode([
+        'bearer' => ['private.vaults-edge.net' => 'a-vaults-key', 'dist.vaults-edge.net' => 'x'],
+        'http-basic' => ['satis.dedoc.co' => ['username' => 'tom', 'password' => 'hunter2']],
+    ]));
+
+    $lock = json_encode([
+        'packages' => [
+            ['name' => 'acme/own-lib', 'dist' => ['url' => 'https://private.vaults-edge.net/dist/acme/own-lib/sha256/ab/abc.zip']],
+            ['name' => 'dedoc/scramble-pro', 'dist' => ['url' => 'https://private.vaults-edge.net/dist/dedoc/scramble-pro/sha256/cd/cde.zip']],
+            ['name' => 'vendor/lib', 'dist' => ['url' => 'https://dist.vaults-edge.net/dist/sha256/ef/ef0.zip']],
+            ['name' => 'dedoc/other', 'dist' => ['url' => 'https://satis.dedoc.co/dist/dedoc/other/1.0.0.zip']],
+        ],
+        'packages-dev' => [],
+    ], JSON_THROW_ON_ERROR);
+
+    $detected = (new PrivateRepositoryDetector)->detect($lock, $this->dir, []);
+
+    expect($detected)->toHaveCount(1)
+        ->and($detected[0]['host'])->toBe('satis.dedoc.co');
+});
