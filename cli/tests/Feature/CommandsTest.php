@@ -900,7 +900,7 @@ it('wires the private repository and key from the deposit when private packages 
         ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'yes')
         ->expectsOutputToContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->expectsOutputToContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
-        ->expectsOutputToContain('CI and servers need a private access key for https://private.vaults-edge.net')
+        ->expectsOutputToContain('vaults private:keys:create "CI" --project=')
         ->assertExitCode(0);
 
     $auth = json_decode((string) file_get_contents($this->workDir.'/auth.json'), true);

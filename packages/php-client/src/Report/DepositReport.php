@@ -162,7 +162,7 @@ final readonly class DepositReport
     private function packages(array $items, string $colour, string $reason): array
     {
         $shown = array_slice($items, 0, self::MaxPackagesPerGroup);
-        $width = max(array_map(fn (DepositRunItem $item): int => mb_strlen($item->package.' '.$item->version), $shown));
+        $width = max([0, ...array_map(fn (DepositRunItem $item): int => mb_strlen($item->package.' '.$item->version), $shown)]);
         $marker = $colour === 'red' ? '✗' : '–';
 
         $lines = array_map(

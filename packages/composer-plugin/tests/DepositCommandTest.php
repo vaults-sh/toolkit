@@ -484,6 +484,7 @@ it('wires the private repository and key from the deposit when private packages 
         ->and($display)->toContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->and($display)->toContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
         ->and($display)->toContain('CI and servers need a private access key for https://private.vaults-edge.net')
+        ->and($display)->toContain('composer vaults:private:keys:create "CI" --project=')
         ->and($writer->privateUrl)->toBe('https://private.vaults-edge.net')
         ->and($auth['bearer']['private.vaults-edge.net'])->toBe('vault-key-xyz')
         ->and($lock)->toContain('"rewritten": true')

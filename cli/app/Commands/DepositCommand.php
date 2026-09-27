@@ -142,7 +142,7 @@ class DepositCommand extends Command
             $this->line('<fg=gray>Commit composer.json, composer.lock and .vaults.json.</>');
 
             if ($run->depositedPrivateItems() !== []) {
-                $this->line('<fg=gray>CI and servers need a private access key for '.($rewritten->privateRepository['url'] ?? 'your private repository').' in auth.json or COMPOSER_AUTH: vaults private:keys:create "CI".</>');
+                $this->line('<fg=gray>CI and servers need a private access key for '.($rewritten->privateRepository['url'] ?? 'your private repository').' in auth.json or COMPOSER_AUTH: vaults private:keys:create "CI" --project='.$projectUuid.'</>');
             } else {
                 $this->line('<fg=gray>Installing needs no Vaults token, in CI or anywhere else.</>');
             }
