@@ -13,6 +13,7 @@ use Vaults\Composer\LockContentHash;
 use Vaults\Composer\PrivateLink;
 use Vaults\Composer\PrivateRepositoryDetector;
 use Vaults\ComposerPlugin\Support\ComposerJsonRepositories;
+use Vaults\ComposerPlugin\Support\DepositProgress;
 use Vaults\ComposerPlugin\Support\ProjectLinker;
 use Vaults\ComposerPlugin\Support\VaultsCommand;
 use Vaults\Exception\VaultsException;
@@ -79,10 +80,11 @@ final class DepositCommand extends VaultsCommand
 
         foreach ($result->packages as $package) {
             $output->writeln(sprintf(
-                '  %s %s %s%s',
+                '  %s %s %s%s%s',
                 $package->deposited ? '<fg=green>✓</>' : '<fg=red>✗</>',
                 $package->name,
                 $package->version,
+                $package->privateLabel() === null ? '' : ' <fg=cyan>[private · '.$package->privateLabel().']</>',
                 $package->securityStatus !== null && $package->securityStatus !== 'clear' ? ' <comment>['.$package->securityStatus.']</comment>' : '',
             ));
         }
@@ -111,21 +113,29 @@ final class DepositCommand extends VaultsCommand
 
         $run = $client->deposit($projectUuid, $lock);
 
-        $output->writeln('Deposit run started.');
+        $output->writeln('Deposit run started. Analysing composer.lock...');
 
         $report = new DepositReport('composer vaults:');
+        $progress = new DepositProgress($output);
         $scoped = false;
 
         while (! $run->isFinished()) {
             $this->sleeper()->sleep(2);
             $run = $client->getRun($run->uuid);
 
-            if ($run->packagesTotal === 0 || ! $run->analysed) {
+            if ($run->packagesTotal === 0) {
+                continue;
+            }
+
+            if (! $run->analysed) {
+                $progress->checking($run);
+
                 continue;
             }
 
             if (! $scoped) {
                 $scoped = true;
+                $progress->finish();
                 $scope = $report->scope($run);
 
                 if ($scope !== null) {
@@ -133,10 +143,12 @@ final class DepositCommand extends VaultsCommand
                 }
             }
 
-            if ($run->packagesToDeposit() > 0) {
-                $output->write("\r".'Deposited '.$run->packagesProcessed().'/'.$run->packagesToDeposit().'...');
+            if ($run->packagesToDeposit() > 0 && ! $run->isFinished()) {
+                $progress->depositing($run);
             }
         }
+
+        $progress->finish();
 
         if (! $scoped) {
             $scope = $report->scope($run);

@@ -511,8 +511,9 @@ it('shows only the new package as work when the rest are already in Vaults', fun
 
     expect($exit)->toBe(0)
         ->and($display)->toContain('142 packages in composer.lock · 141 already in Vaults · 1 to deposit')
-        ->and($display)->toContain('Deposited 0/1...')
-        ->and($display)->not->toContain('/142')
+        ->and($display)->toContain('Checking 142 packages against Vaults...')
+        ->and($display)->toContain('Depositing 1 new package...')
+        ->and($display)->not->toContain('Depositing 142')
         ->and($display)->toContain('Deposited 1 new · Already in Vaults 141 · Skipped 0 · Failed 0');
 });
 
@@ -533,4 +534,59 @@ it('says every package is already in Vaults when there is nothing new', function
     expect($exit)->toBe(0)
         ->and($this->tester->getDisplay())->toContain('✓ All 142 packages in composer.lock are already in Vaults.')
         ->and($this->tester->getDisplay())->not->toContain('Deposited 0/0');
+});
+
+it('draws a progress bar while it checks and while it deposits on a terminal', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 0]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 60, 'packages_already_deposited' => null]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 139, 'packages_already_deposited' => 139]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 141, 'packages_already_deposited' => 139]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 142, 'packages_deposited' => 142, 'packages_already_deposited' => 139]]);
+    $this->transport->queueJson([
+        'composer_lock' => '{"packages":[],"rewritten":true}',
+        'repositories' => [
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        ],
+    ]);
+
+    $exit = $this->tester->execute(['--write' => true], ['decorated' => true]);
+    $display = (string) preg_replace('/\e\[[0-9;]*[A-Za-z]|\e\][0-9;]*\e\\\\/', '', $this->tester->getDisplay());
+
+    expect($exit)->toBe(0)
+        ->and($display)->toContain('Checking 142 packages against Vaults [')
+        ->and($display)->toContain('60/142')
+        ->and($display)->toContain('Depositing 3 new packages [')
+        ->and($display)->toContain('2/3')
+        ->and($display)->toContain('3/3')
+        ->and($display)->toContain('Deposited 3 new · Already in Vaults 139 · Skipped 0 · Failed 0');
+
+});
+
+it('marks private packages and where they come from when checking', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => [
+        'total' => 4,
+        'deposited' => 4,
+        'undeposited' => 0,
+        'packages' => [
+            ['name' => 'laravel/framework', 'version' => 'v13.33.0', 'deposited' => true, 'security_status' => 'clear', 'private' => false, 'private_source' => null],
+            ['name' => 'dedoc/scramble-pro', 'version' => 'v0.9.16', 'deposited' => true, 'security_status' => 'clear', 'private' => true, 'private_source' => 'third_party'],
+            ['name' => 'vaults-sh/private-demo', 'version' => 'v1.2.0', 'deposited' => true, 'security_status' => 'clear', 'private' => true, 'private_source' => 'own_repository'],
+            ['name' => 'partner/shared-lib', 'version' => 'v1.0.0', 'deposited' => true, 'security_status' => 'clear', 'private' => true, 'private_source' => 'shared'],
+        ],
+    ]]);
+
+    $exit = $this->tester->execute(['--check' => true]);
+    $display = $this->tester->getDisplay();
+
+    expect($exit)->toBe(0)
+        ->and($display)->toContain('✓ laravel/framework v13.33.0'."\n")
+        ->and($display)->toContain('✓ dedoc/scramble-pro v0.9.16 [private · third-party]')
+        ->and($display)->toContain('✓ vaults-sh/private-demo v1.2.0 [private · your repository]')
+        ->and($display)->toContain('✓ partner/shared-lib v1.0.0 [private · shared with you]');
 });

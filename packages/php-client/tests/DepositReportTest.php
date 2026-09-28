@@ -159,3 +159,9 @@ it('knows a run is still being analysed until the server has counted what it alr
 
     expect($run->analysed)->toBeFalse();
 });
+
+it('counts how far the check has got while a run is still being analysed', function () {
+    $run = DepositRun::fromArray(['uuid' => 'run', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 90, 'packages_skipped' => 4, 'packages_failed' => 2, 'packages_already_deposited' => null]);
+
+    expect($run->packagesChecked())->toBe(96);
+});

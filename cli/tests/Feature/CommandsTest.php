@@ -945,6 +945,7 @@ it('shows only the new package as work when the rest are already in Vaults', fun
     ]);
 
     $this->artisan('deposit')
+        ->expectsOutputToContain('Checking 142 packages against Vaults...')
         ->expectsOutputToContain('142 packages in composer.lock · 141 already in Vaults · 1 to deposit')
         ->expectsConfirmation('Add it now?', 'no')
         ->expectsOutputToContain('Deposited 1 new · Already in Vaults 141 · Skipped 0 · Failed 0')
@@ -968,5 +969,29 @@ it('skips the progress bar when every package is already in Vaults', function ()
         ->expectsOutputToContain('✓ All 142 packages in composer.lock are already in Vaults.')
         ->expectsConfirmation('Add it now?', 'no')
         ->expectsOutputToContain('Deposited 0 new · Already in Vaults 142 · Skipped 0 · Failed 0')
+        ->assertExitCode(0);
+});
+
+it('shows a private column when checking', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => [
+        'total' => 3,
+        'deposited' => 3,
+        'undeposited' => 0,
+        'packages' => [
+            ['name' => 'laravel/framework', 'version' => 'v13.33.0', 'deposited' => true, 'security_status' => 'clear'],
+            ['name' => 'dedoc/scramble-pro', 'version' => 'v0.9.16', 'deposited' => true, 'security_status' => 'clear', 'private' => true, 'private_source' => 'third_party'],
+            ['name' => 'vaults-sh/private-demo', 'version' => 'v1.2.0', 'deposited' => true, 'security_status' => 'clear', 'private' => true, 'private_source' => 'own_repository'],
+        ],
+    ]]);
+
+    $this->artisan('deposit', ['--check' => true])
+        ->expectsTable(['Package', 'Version', 'Private', 'Deposited', 'Security'], [
+            ['laravel/framework', 'v13.33.0', '', '<fg=green>✓</>', '<info>clear</info>'],
+            ['dedoc/scramble-pro', 'v0.9.16', '<fg=cyan>third-party</>', '<fg=green>✓</>', '<info>clear</info>'],
+            ['vaults-sh/private-demo', 'v1.2.0', '<fg=cyan>your repository</>', '<fg=green>✓</>', '<info>clear</info>'],
+        ])
         ->assertExitCode(0);
 });

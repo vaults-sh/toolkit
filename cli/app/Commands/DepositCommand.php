@@ -78,10 +78,11 @@ class DepositCommand extends Command
         $result = spin(fn () => $client->depositCheck($projectUuid, $lock), 'Checking deposit status...');
 
         $this->table(
-            ['Package', 'Version', 'Deposited', 'Security'],
+            ['Package', 'Version', 'Private', 'Deposited', 'Security'],
             array_map(fn (CheckPackage $package): array => [
                 $package->name,
                 $package->version,
+                $package->privateLabel() === null ? '' : '<fg=cyan>'.$package->privateLabel().'</>',
                 $package->deposited ? '<fg=green>✓</>' : '<fg=red>✗</>',
                 $this->securityLabel($package->securityStatus),
             ], $result->packages),
@@ -277,7 +278,7 @@ class DepositCommand extends Command
     private function awaitRun(VaultsClient $client, Sleeper $sleeper, DepositRun $run): DepositRun
     {
         $run = spin(function () use ($client, $sleeper, $run): DepositRun {
-            while (! $run->isFinished() && ($run->packagesTotal === 0 || ! $run->analysed)) {
+            while (! $run->isFinished() && $run->packagesTotal === 0) {
                 $sleeper->sleep(1);
 
                 $run = $client->getRun($run->uuid);
@@ -285,6 +286,29 @@ class DepositCommand extends Command
 
             return $run;
         }, 'Analysing composer.lock...');
+
+        if (! $run->isFinished() && ! $run->analysed) {
+            $checking = progress(label: 'Checking '.$run->packagesTotal.' '.($run->packagesTotal === 1 ? 'package' : 'packages').' against Vaults...', steps: $run->packagesTotal);
+            $checking->start();
+            $checked = 0;
+
+            while (! $run->isFinished() && ! $run->analysed) {
+                if ($run->packagesChecked() > $checked) {
+                    $checking->advance($run->packagesChecked() - $checked);
+                    $checked = $run->packagesChecked();
+                }
+
+                $sleeper->sleep(1);
+
+                $run = $client->getRun($run->uuid);
+            }
+
+            if ($run->packagesTotal > $checked) {
+                $checking->advance($run->packagesTotal - $checked);
+            }
+
+            $checking->finish();
+        }
 
         $scope = (new DepositReport('vaults '))->scope($run);
 

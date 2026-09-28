@@ -59,6 +59,11 @@ final readonly class DepositRun
         return max(0, $this->packagesTotal - ($this->packagesAlreadyDeposited ?? 0));
     }
 
+    public function packagesChecked(): int
+    {
+        return max(0, min($this->packagesTotal, $this->packagesDeposited + $this->packagesSkipped + $this->packagesFailed));
+    }
+
     public function packagesProcessed(): int
     {
         $processed = $this->packagesDeposited + $this->packagesSkipped + $this->packagesFailed - ($this->packagesAlreadyDeposited ?? 0);
