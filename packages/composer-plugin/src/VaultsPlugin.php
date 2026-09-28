@@ -15,7 +15,10 @@ use Composer\Script\ScriptEvents;
 use Throwable;
 use Vaults\Auth\CredentialResolver;
 use Vaults\Auth\TokenStore;
+use Vaults\ComposerPlugin\Support\AutoPin;
 use Vaults\Project\ProjectManifest;
+use Vaults\Support\NativeSleeper;
+use Vaults\Support\Sleeper;
 use Vaults\VaultsClient;
 
 class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
@@ -79,9 +82,16 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
             return;
         }
 
-        $run = $this->client()->withToken($token)->deposit($projectUuid, (string) file_get_contents($lockPath));
+        $pin = new AutoPin($this->client()->withToken($token), $this->sleeper());
 
-        $io->write('<info>Vaults:</info> depositing composer.lock in the background. Run "composer vaults:deposit --write" to pin composer.lock to Vaults.');
+        foreach ($pin($projectUuid, $directory, $this->waitSeconds($event)) as $line) {
+            $io->write($line);
+        }
+    }
+
+    protected function sleeper(): Sleeper
+    {
+        return new NativeSleeper;
     }
 
     protected function workingDirectory(): string
@@ -97,6 +107,24 @@ class VaultsPlugin implements Capable, EventSubscriberInterface, PluginInterface
     protected function client(): VaultsClient
     {
         return new VaultsClient;
+    }
+
+    private function waitSeconds(Event $event): int
+    {
+        if (in_array(getenv('VAULTS_AUTO_PIN'), ['0', 'false', 'off'], true)) {
+            return 0;
+        }
+
+        $extra = $event->getComposer()->getPackage()->getExtra();
+        $settings = is_array($extra['vaults'] ?? null) ? $extra['vaults'] : [];
+
+        if (($settings['auto-pin'] ?? true) === false) {
+            return 0;
+        }
+
+        $wait = $settings['auto-pin-wait'] ?? AutoPin::DefaultWaitSeconds;
+
+        return is_int($wait) ? max(0, min($wait, AutoPin::MaximumWaitSeconds)) : AutoPin::DefaultWaitSeconds;
     }
 
     private function optedOut(Event $event): bool

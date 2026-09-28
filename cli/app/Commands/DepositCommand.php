@@ -277,7 +277,7 @@ class DepositCommand extends Command
     private function awaitRun(VaultsClient $client, Sleeper $sleeper, DepositRun $run): DepositRun
     {
         $run = spin(function () use ($client, $sleeper, $run): DepositRun {
-            while (! $run->isFinished() && $run->packagesTotal === 0) {
+            while (! $run->isFinished() && ($run->packagesTotal === 0 || ! $run->analysed)) {
                 $sleeper->sleep(1);
 
                 $run = $client->getRun($run->uuid);
@@ -286,12 +286,31 @@ class DepositCommand extends Command
             return $run;
         }, 'Analysing composer.lock...');
 
+        $scope = (new DepositReport('vaults '))->scope($run);
+
+        if ($scope !== null) {
+            $this->line($scope);
+        }
+
         if ($run->isFinished()) {
             return $run;
         }
 
-        $total = $run->packagesTotal;
-        $progress = progress(label: 'Depositing '.$total.' packages...', steps: $total);
+        $total = $run->packagesToDeposit();
+
+        if ($total === 0) {
+            return spin(function () use ($client, $sleeper, $run): DepositRun {
+                while (! $run->isFinished()) {
+                    $sleeper->sleep(1);
+
+                    $run = $client->getRun($run->uuid);
+                }
+
+                return $run;
+            }, 'Checking the repository is up to date...');
+        }
+
+        $progress = progress(label: 'Depositing '.$total.' '.($run->packagesAlreadyDeposited === null ? '' : 'new ').($total === 1 ? 'package' : 'packages').'...', steps: $total);
         $progress->start();
         $reported = 0;
 
@@ -300,10 +319,10 @@ class DepositCommand extends Command
 
             $run = $client->getRun($run->uuid);
 
-            $done = min($total, $run->packagesDeposited + $run->packagesSkipped + $run->packagesFailed);
+            $done = $run->packagesProcessed();
 
             if ($done > $reported) {
-                $progress->hint($run->packagesDeposited.' deposited · '.$run->packagesSkipped.' skipped'.($run->packagesPrivate > 0 ? ' ('.$run->packagesPrivate.' private)' : '').' · '.$run->packagesFailed.' failed');
+                $progress->hint($run->packagesNewlyDeposited().' deposited · '.$run->packagesSkipped.' skipped'.($run->packagesPrivate > 0 ? ' ('.$run->packagesPrivate.' private)' : '').' · '.$run->packagesFailed.' failed');
                 $progress->advance($done - $reported);
                 $reported = $done;
             }

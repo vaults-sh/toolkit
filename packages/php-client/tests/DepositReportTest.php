@@ -112,3 +112,50 @@ it('aligns detected private repositories into columns and pads long package list
             'Vaults can use these credentials to authorise this project for those packages. Other projects are never given access through them.',
         ]);
 });
+
+it('shows only the new packages as work when the server says what was already in Vaults', function () {
+    $run = DepositRun::fromArray([
+        'uuid' => 'run',
+        'status' => 'completed',
+        'packages_total' => 142,
+        'packages_deposited' => 142,
+        'packages_already_deposited' => 141,
+    ]);
+
+    $report = new DepositReport('vaults ');
+
+    expect($run->packagesToDeposit())->toBe(1)
+        ->and($run->packagesProcessed())->toBe(1)
+        ->and($run->packagesNewlyDeposited())->toBe(1)
+        ->and(plain([$report->scope($run)])[0])->toBe('142 packages in composer.lock · 141 already in Vaults · 1 to deposit')
+        ->and(plain([$report->summary($run)])[0])->toBe('Deposited 1 new · Already in Vaults 141 · Skipped 0 · Failed 0');
+});
+
+it('says so when nothing new needs depositing', function () {
+    $run = DepositRun::fromArray([
+        'uuid' => 'run',
+        'status' => 'completed',
+        'packages_total' => 142,
+        'packages_deposited' => 142,
+        'packages_already_deposited' => 142,
+    ]);
+
+    expect($run->packagesToDeposit())->toBe(0)
+        ->and(plain([(new DepositReport('vaults '))->scope($run)])[0])->toBe('✓ All 142 packages in composer.lock are already in Vaults.');
+});
+
+it('keeps the original wording for a server that does not report what was already in Vaults', function () {
+    $run = DepositRun::fromArray(['uuid' => 'run', 'status' => 'completed', 'packages_total' => 3, 'packages_deposited' => 3]);
+
+    $report = new DepositReport('vaults ');
+
+    expect($run->analysed)->toBeTrue()
+        ->and($report->scope($run))->toBeNull()
+        ->and(plain([$report->summary($run)])[0])->toBe('Deposited 3 · Skipped 0 · Failed 0');
+});
+
+it('knows a run is still being analysed until the server has counted what it already holds', function () {
+    $run = DepositRun::fromArray(['uuid' => 'run', 'status' => 'running', 'packages_total' => 142, 'packages_already_deposited' => null]);
+
+    expect($run->analysed)->toBeFalse();
+});

@@ -928,3 +928,45 @@ it('keeps composer.lock in sync when private:link edits composer.json', function
     expect($composer)->toContain('private.vaults-edge.net')
         ->and((string) file_get_contents($this->workDir.'/composer.lock'))->toContain('"content-hash": "'.(new LockContentHash)->contentHash($composer).'"');
 });
+
+it('shows only the new package as work when the rest are already in Vaults', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'pending', 'packages_total' => 0]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 90, 'packages_already_deposited' => null]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 141, 'packages_already_deposited' => 141]]);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 142, 'packages_deposited' => 142, 'packages_already_deposited' => 141]]);
+    $this->transport->queueJson([
+        'composer_lock' => '{"packages":[]}',
+        'repositories' => [
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        ],
+    ]);
+
+    $this->artisan('deposit')
+        ->expectsOutputToContain('142 packages in composer.lock · 141 already in Vaults · 1 to deposit')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('Deposited 1 new · Already in Vaults 141 · Skipped 0 · Failed 0')
+        ->assertExitCode(0);
+});
+
+it('skips the progress bar when every package is already in Vaults', function () {
+    file_put_contents($this->workDir.'/composer.lock', '{"packages":[]}');
+    file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
+
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'running', 'packages_total' => 142, 'packages_deposited' => 142, 'packages_already_deposited' => 142]], 202);
+    $this->transport->queueJson(['data' => ['uuid' => 'run-uuid', 'status' => 'completed', 'packages_total' => 142, 'packages_deposited' => 142, 'packages_already_deposited' => 142]]);
+    $this->transport->queueJson([
+        'composer_lock' => '{"packages":[]}',
+        'repositories' => [
+            'project' => ['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc'],
+        ],
+    ]);
+
+    $this->artisan('deposit')
+        ->expectsOutputToContain('✓ All 142 packages in composer.lock are already in Vaults.')
+        ->expectsConfirmation('Add it now?', 'no')
+        ->expectsOutputToContain('Deposited 0 new · Already in Vaults 142 · Skipped 0 · Failed 0')
+        ->assertExitCode(0);
+});

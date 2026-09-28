@@ -85,4 +85,4 @@ Caveat: with Packagist disabled, `composer update` and `composer require` cannot
 
 - **`composer install`** always installs from Vaults: the rewritten `composer.lock` points every dist at `dist.vaults-edge.net`, with each package's `source` (GitHub) kept as an automatic fallback if a Vaults download ever fails.
 - **`composer update` / `require`** resolve versions against Packagist and prefer Vaults for any version Vaults already holds (the Vaults repository is `canonical: false`, so it's consulted first but never hides newer upstream releases).
-- Vaults backfills tracked packages toward full coverage automatically, and this plugin deposits whatever you update to in the background, so you converge on Vaults with no manual step. Run `composer deposit --write` after an update to pin the lock immediately.
+- Vaults backfills tracked packages toward full coverage automatically, and the Composer plugin deposits whatever you update to and pins `composer.lock` itself, so you converge on Vaults with no manual step. Without the plugin, run `vaults deposit --write` after an update.

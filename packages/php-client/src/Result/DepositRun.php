@@ -20,6 +20,8 @@ final readonly class DepositRun
         public ?string $startedAt,
         public ?string $finishedAt,
         public ?array $items = null,
+        public ?int $packagesAlreadyDeposited = null,
+        public bool $analysed = true,
     ) {}
 
     /**
@@ -47,7 +49,26 @@ final readonly class DepositRun
             is_string($data['started_at'] ?? null) ? $data['started_at'] : null,
             is_string($data['finished_at'] ?? null) ? $data['finished_at'] : null,
             $items,
+            is_int($data['packages_already_deposited'] ?? null) ? $data['packages_already_deposited'] : null,
+            ! array_key_exists('packages_already_deposited', $data) || $data['packages_already_deposited'] !== null,
         );
+    }
+
+    public function packagesToDeposit(): int
+    {
+        return max(0, $this->packagesTotal - ($this->packagesAlreadyDeposited ?? 0));
+    }
+
+    public function packagesProcessed(): int
+    {
+        $processed = $this->packagesDeposited + $this->packagesSkipped + $this->packagesFailed - ($this->packagesAlreadyDeposited ?? 0);
+
+        return max(0, min($this->packagesToDeposit(), $processed));
+    }
+
+    public function packagesNewlyDeposited(): int
+    {
+        return max(0, $this->packagesDeposited - ($this->packagesAlreadyDeposited ?? 0));
     }
 
     public function isFinished(): bool

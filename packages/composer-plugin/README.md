@@ -62,15 +62,44 @@ Installs are scoped the same way. `composer vaults:private:link` creates a key b
 
 ## Automatic deposits after `composer update`
 
-Once a project is linked (a committed `.vaults.json`) and you are logged in, the plugin deposits the new `composer.lock` after every `composer update` so the mirror never lags behind your lockfile. It runs after Composer has finished, never blocks or fails an update, and prints one line when it has queued a deposit. Nothing is sent when there is no token or no manifest, so unlinked projects and CI without `VAULTS_TOKEN` are unaffected.
+Once a project is linked (a committed `.vaults.json`) and you are logged in, the plugin finishes the job after every `composer update` or `composer require`: it deposits the new `composer.lock`, waits for the deposit, and rewrites the lock so it installs from Vaults. There is no second command to run.
 
-Opt out per project in `composer.json`:
+```
+Vaults: 143 packages in composer.lock · 141 already in Vaults · 2 to deposit
+Vaults: ✓ composer.lock now installs from Vaults.
+```
+
+It waits at most 30 seconds. Only packages Vaults does not hold yet need depositing, so a normal update finishes well inside that. When a deposit takes longer, such as the first one for a large project, the plugin leaves the lock alone, carries on depositing in the background and tells you to run `composer vaults:deposit --write` when you are ready.
+
+The plugin never asks a question during an update and never fails one. It leaves `composer.lock` untouched and says why when:
+
+- a package did not deposit, or a private repository needs credentials;
+- private packages were deposited but this project is not yet set up to install them from Vaults;
+- the Vaults repository is not in `composer.json` yet.
+
+Run `composer vaults:deposit --write` once in those cases. It asks what it needs to and wires the project, after which updates pin themselves.
+
+This happens in non-interactive runs too, so a bot that opens dependency update pull requests produces a lock that already installs from Vaults. Nothing is sent when there is no token or no manifest, so unlinked projects and CI without `VAULTS_TOKEN` are unaffected.
+
+Settings in `composer.json`:
 
 ```json
 "extra": {
-    "vaults": {"auto-deposit": false}
+    "vaults": {
+        "auto-deposit": true,
+        "auto-pin": true,
+        "auto-pin-wait": 30
+    }
 }
 ```
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `auto-deposit` | `true` | `false` switches the plugin's hook off entirely |
+| `auto-pin` | `true` | `false` deposits in the background and never touches the lock |
+| `auto-pin-wait` | `30` | Seconds to wait for the deposit, from 0 to 120. `0` behaves like `auto-pin: false` |
+
+Set `VAULTS_AUTO_PIN=0` in the environment to skip pinning for a single run.
 
 ## Development
 
@@ -95,4 +124,4 @@ Caveat: with Packagist disabled, `composer update` and `composer require` cannot
 
 - **`composer install`** always installs from Vaults: the rewritten `composer.lock` points every dist at `dist.vaults-edge.net`, with each package's `source` (GitHub) kept as an automatic fallback if a Vaults download ever fails.
 - **`composer update` / `require`** resolve versions against Packagist and prefer Vaults for any version Vaults already holds (the Vaults repository is `canonical: false`, so it's consulted first but never hides newer upstream releases).
-- Vaults backfills tracked packages toward full coverage automatically, and this plugin deposits whatever you update to in the background, so you converge on Vaults with no manual step. Run `composer deposit --write` after an update to pin the lock immediately.
+- Vaults backfills tracked packages toward full coverage automatically, and the Composer plugin deposits whatever you update to and pins `composer.lock` itself, so you converge on Vaults with no manual step. Without the plugin, run `vaults deposit --write` after an update.

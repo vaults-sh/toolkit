@@ -19,7 +19,11 @@ final readonly class DepositReport
 
     public function summary(DepositRun $run): string
     {
-        $line = 'Deposited <info>'.$run->packagesDeposited.'</info> · Skipped <comment>'.$run->packagesSkipped.'</comment> · Failed '
+        $deposited = $run->packagesAlreadyDeposited === null
+            ? 'Deposited <info>'.$run->packagesDeposited.'</info>'
+            : 'Deposited <info>'.$run->packagesNewlyDeposited().' new</info> · Already in Vaults <info>'.$run->packagesAlreadyDeposited.'</info>';
+
+        $line = $deposited.' · Skipped <comment>'.$run->packagesSkipped.'</comment> · Failed '
             .($run->packagesFailed > 0 ? '<fg=red>'.$run->packagesFailed.'</>' : '<info>0</info>');
 
         if ($run->packagesPrivate > 0) {
@@ -27,6 +31,21 @@ final readonly class DepositReport
         }
 
         return $line;
+    }
+
+    public function scope(DepositRun $run): ?string
+    {
+        if ($run->packagesAlreadyDeposited === null) {
+            return null;
+        }
+
+        $new = $run->packagesToDeposit();
+
+        if ($new === 0) {
+            return '<fg=green>✓</> All <info>'.$run->packagesTotal.'</info> packages in composer.lock are already in Vaults.';
+        }
+
+        return '<info>'.$run->packagesTotal.'</info> packages in composer.lock · <info>'.$run->packagesAlreadyDeposited.'</info> already in Vaults · <fg=cyan>'.$new.'</> to deposit';
     }
 
     public function coverage(DepositRun $run): string

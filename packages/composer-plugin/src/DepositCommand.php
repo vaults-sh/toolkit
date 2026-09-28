@@ -113,13 +113,38 @@ final class DepositCommand extends VaultsCommand
 
         $output->writeln('Deposit run started.');
 
+        $report = new DepositReport('composer vaults:');
+        $scoped = false;
+
         while (! $run->isFinished()) {
             $this->sleeper()->sleep(2);
             $run = $client->getRun($run->uuid);
-            $output->write("\r".'Deposited '.$run->packagesDeposited.'/'.$run->packagesTotal.'...');
+
+            if ($run->packagesTotal === 0 || ! $run->analysed) {
+                continue;
+            }
+
+            if (! $scoped) {
+                $scoped = true;
+                $scope = $report->scope($run);
+
+                if ($scope !== null) {
+                    $output->writeln($scope);
+                }
+            }
+
+            if ($run->packagesToDeposit() > 0) {
+                $output->write("\r".'Deposited '.$run->packagesProcessed().'/'.$run->packagesToDeposit().'...');
+            }
         }
 
-        $report = new DepositReport('composer vaults:');
+        if (! $scoped) {
+            $scope = $report->scope($run);
+
+            if ($scope !== null) {
+                $output->writeln($scope);
+            }
+        }
 
         $output->writeln('');
         $output->writeln($report->summary($run));
