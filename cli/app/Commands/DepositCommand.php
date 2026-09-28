@@ -110,9 +110,14 @@ class DepositCommand extends Command
             $this->offerPrivateRepositories($client, $projectUuid, $lock, $directory);
         }
 
+        $report = new DepositReport('vaults ');
+
+        foreach ($report->heading($retried ? 'Deposit again with the new credentials' : 'Deposit') as $line) {
+            $this->line($line);
+        }
+
         $run = spin(fn () => $client->deposit($projectUuid, $lock), 'Starting the deposit run...');
         $run = $this->awaitRun($client, $this->laravel->make(Sleeper::class), $run);
-        $report = new DepositReport('vaults ');
 
         $this->line($report->summary($run));
         $this->line($report->coverage($run));
@@ -133,12 +138,19 @@ class DepositCommand extends Command
 
         $rewritten = spin(fn () => $client->getRewrittenLock($run->uuid), 'Fetching the rewritten lock...');
 
+        foreach ($report->heading('Install from Vaults') as $line) {
+            $this->line($line);
+        }
+
         $this->offerRepositoryWiring($rewritten, $directory);
         $this->offerPrivateWiring($client, $projectUuid, $run, $rewritten, $directory);
 
+        foreach ($report->heading($this->option('write') ? 'Done' : 'Next step') as $line) {
+            $this->line($line);
+        }
+
         if ($this->option('write')) {
             file_put_contents($lockPath, resolve(LockContentHash::class)->refresh($rewritten->composerLock, $directory.DIRECTORY_SEPARATOR.'composer.json'));
-            $this->newLine();
             $this->line('<fg=green>✓</> composer.lock now installs from Vaults. Nothing to reinstall here.');
             $this->line('<fg=gray>Commit composer.json, composer.lock and .vaults.json.</>');
 
@@ -148,7 +160,6 @@ class DepositCommand extends Command
                 $this->line('<fg=gray>Installing needs no Vaults token, in CI or anywhere else.</>');
             }
         } else {
-            $this->newLine();
             $this->line('Run <options=bold>vaults deposit --write</> to pin composer.lock to Vaults.');
         }
 
@@ -173,12 +184,11 @@ class DepositCommand extends Command
             return;
         }
 
-        $this->newLine();
-        $this->line(count($private) === 1
-            ? '<fg=cyan>'.$private[0]->package.'</> is authorised for this project and served from your private repository.'
-            : '<fg=cyan>'.count($private).' packages</> are authorised for this project and served from your private repository.');
+        foreach ((new DepositReport('vaults '))->privateWiring($private) as $line) {
+            $this->line($line);
+        }
 
-        if (! $this->input->isInteractive() || ! confirm('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)')) {
+        if (! $this->input->isInteractive() || ! confirm('Set this project up to install private packages from Vaults?')) {
             $this->line('<fg=gray>→</> Run <options=bold>vaults private:link</> when you are ready to install them from Vaults.');
 
             return;

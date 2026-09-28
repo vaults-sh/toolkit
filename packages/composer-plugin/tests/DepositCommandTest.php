@@ -349,7 +349,7 @@ it('lists every package that did not deposit with its reason and offers credenti
         ->and($display)->toContain('composer vaults:repositories:add satis.dedoc.co')
         ->and($display)->toContain('1 local path dependency skipped')
         ->and($display)->toContain('Saved credentials for satis.dedoc.co')
-        ->and($display)->toContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
+        ->and($display)->toContain('dedoc/scramble-pro is now stored in your team\'s private Vaults repository.')
         ->and($display)->toContain('Run composer vaults:private:link when you are ready')
         ->and($this->io->questions[0])->toContain('Authorise this project with the satis.dedoc.co credentials from ./auth.json and deposit again?')
         ->and(json_decode((string) $this->transport->requests[2]->body, true))->toBe(['project' => 'project-uuid', 'host' => 'satis.dedoc.co', 'type' => 'http-basic', 'secret' => 'hunter2', 'username' => 'tom']);
@@ -398,7 +398,7 @@ it('detects paid repositories in composer.lock before depositing and asks to use
     $display = $this->tester->getDisplay();
 
     expect($exit)->toBe(0)
-        ->and($display)->toContain('Private repositories in composer.lock')
+        ->and($display)->toContain('▸ Third-party private packages')
         ->and($display)->toContain('satis.dedoc.co  1 package  dedoc/scramble-pro')
         ->and($display)->toContain('credentials in ./auth.json (bearer)')
         ->and($this->io->questions[0])->toBe('Use the satis.dedoc.co credentials? [Y/n] ')
@@ -428,6 +428,7 @@ it('skips the up-front question when the team already holds the credentials', fu
 });
 
 it('wires the private repository and key from the deposit when private packages were deposited', function () {
+
     file_put_contents($this->workDir.'/composer.lock', '{"content-hash": "0000000000000000000000000000dead", "packages": []}');
     file_put_contents($this->workDir.'/composer.json', json_encode(['name' => 'acme/app', 'repositories' => [['type' => 'composer', 'url' => 'https://repo.vaults-edge.net/repo/projects/abc']]]));
     file_put_contents($this->workDir.'/.vaults.json', '{"project":"project-uuid"}');
@@ -480,7 +481,14 @@ it('wires the private repository and key from the deposit when private packages 
     $lock = (string) file_get_contents($this->workDir.'/composer.lock');
 
     expect($exit)->toBe(0)
-        ->and($this->io->questions)->toBe(['Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json) [Y/n] '])
+        ->and($this->io->questions)->toBe(['Set this project up to install private packages from Vaults? [Y/n] '])
+        ->and($display)->toContain('▸ Deposit')
+        ->and($display)->toContain('▸ Install from Vaults')
+        ->and($display)->toContain('To install it from Vaults, this project needs two things:')
+        ->and($display)->toContain('a key in auth.json, tied to this project, that proves it may download it')
+        ->and($display)->toContain('▸ Done')
+        ->and(strpos($display, '▸ Deposit'))->toBeLessThan(strpos($display, '▸ Install from Vaults'))
+        ->and(strpos($display, '▸ Install from Vaults'))->toBeLessThan(strpos($display, '▸ Done'))
         ->and($display)->toContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->and($display)->toContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
         ->and($display)->toContain('CI and servers need a private access key for https://private.vaults-edge.net')

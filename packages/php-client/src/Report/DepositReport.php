@@ -33,6 +33,34 @@ final readonly class DepositReport
         return $line;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function heading(string $title): array
+    {
+        return ['', '<fg=cyan;options=bold>▸ '.$title.'</>'];
+    }
+
+    /**
+     * @param  list<DepositRunItem>  $private
+     * @return list<string>
+     */
+    public function privateWiring(array $private): array
+    {
+        $subject = count($private) === 1
+            ? '<fg=cyan>'.$private[0]->package.'</> is now stored in your team\'s private Vaults repository.'
+            : '<fg=cyan>'.count($private).' private packages</> are now stored in your team\'s private Vaults repository.';
+
+        return [
+            '',
+            '  '.$subject,
+            '  To install '.(count($private) === 1 ? 'it' : 'them').' from Vaults, this project needs two things:',
+            '    <fg=gray>•</> the private repository listed in composer.json',
+            '    <fg=gray>•</> a key in auth.json, tied to this project, that proves it may download '.(count($private) === 1 ? 'it' : 'them'),
+            '',
+        ];
+    }
+
     public function scope(DepositRun $run): ?string
     {
         if ($run->packagesAlreadyDeposited === null) {
@@ -69,7 +97,13 @@ final readonly class DepositReport
         }
 
         $width = max(array_map(fn (array $repository): int => mb_strlen($repository['host']), $repositories));
-        $lines = ['', '<options=bold>Private repositories in composer.lock</>'];
+        $lines = [
+            ...$this->heading('Third-party private packages'),
+            '  Some packages in composer.lock come from a repository that needs a login.',
+            '  Vaults checks your login with the vendor, then keeps its own copy so installs no longer depend on them.',
+            '  <fg=gray>The login is stored for this project only. Other projects are never given access through it.</>',
+            '',
+        ];
 
         foreach ($repositories as $repository) {
             $count = count($repository['packages']);
@@ -83,7 +117,6 @@ final readonly class DepositReport
         }
 
         $lines[] = '';
-        $lines[] = 'Vaults can use these credentials to authorise this project for those packages. Other projects are never given access through them.';
 
         return $lines;
     }

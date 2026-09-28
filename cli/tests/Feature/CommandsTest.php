@@ -742,8 +742,8 @@ it('lists every package that did not deposit with its reason and offers credenti
         ->expectsOutputToContain('vaults repositories:add satis.dedoc.co')
         ->expectsOutputToContain('1 package publishes no archive (source-only), so there is nothing to mirror yet')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
-        ->expectsOutputToContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
-        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'no')
+        ->expectsOutputToContain('dedoc/scramble-pro is now stored in your team\'s private Vaults repository.')
+        ->expectsConfirmation('Set this project up to install private packages from Vaults?', 'no')
         ->expectsOutputToContain('Run vaults private:link when you are ready')
         ->assertExitCode(0);
 
@@ -829,13 +829,15 @@ it('detects paid repositories in composer.lock before depositing and asks to use
     ]]);
 
     $this->artisan('deposit')
-        ->expectsOutputToContain('Private repositories in composer.lock')
+        ->expectsOutputToContain('▸ Third-party private packages')
+        ->expectsOutputToContain('▸ Deposit')
+        ->expectsOutputToContain('▸ Install from Vaults')
         ->expectsOutputToContain('satis.dedoc.co  1 package  dedoc/scramble-pro')
         ->expectsOutputToContain('credentials in ./auth.json (http-basic, tom)')
         ->expectsConfirmation('Use the satis.dedoc.co credentials?', 'yes')
         ->expectsOutputToContain('Saved credentials for satis.dedoc.co')
         ->expectsConfirmation('Add it now?', 'no')
-        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'no')
+        ->expectsConfirmation('Set this project up to install private packages from Vaults?', 'no')
         ->expectsOutputToContain('Deposited 2')
         ->assertExitCode(0);
 
@@ -896,8 +898,8 @@ it('wires the private repository and key from the deposit when private packages 
     queueCreatedKey($this->transport, 'vault-key-xyz');
 
     $this->artisan('deposit', ['--write' => true])
-        ->expectsOutputToContain('dedoc/scramble-pro is authorised for this project and served from your private repository.')
-        ->expectsConfirmation('Wire this project to install them from your private repository? (adds it to composer.json and a key to auth.json)', 'yes')
+        ->expectsOutputToContain('dedoc/scramble-pro is now stored in your team\'s private Vaults repository.')
+        ->expectsConfirmation('Set this project up to install private packages from Vaults?', 'yes')
         ->expectsOutputToContain('Added the private Vaults repository to composer.json and wrote key "tom-macbook" to ./auth.json.')
         ->expectsOutputToContain('composer.lock now installs from Vaults. Nothing to reinstall here.')
         ->expectsOutputToContain('vaults private:keys:create "CI" --project=')

@@ -103,13 +103,16 @@ it('aligns detected private repositories into columns and pads long package list
     expect($report->privateRepositories([]))->toBe([])
         ->and(plain($report->privateRepositories($repositories)))->toBe([
             '',
-            'Private repositories in composer.lock',
+            '▸ Third-party private packages',
+            '  Some packages in composer.lock come from a repository that needs a login.',
+            '  Vaults checks your login with the vendor, then keeps its own copy so installs no longer depend on them.',
+            '  The login is stored for this project only. Other projects are never given access through it.',
+            '',
             '  satis.dedoc.co      1 package  dedoc/scramble-pro',
             '                      credentials in /app/auth.json (http-basic, tom)',
             '  repo.packagist.com  4 packages  a/b, c/d, e/f and 1 more',
             '                      credentials in COMPOSER_AUTH (bearer)',
             '',
-            'Vaults can use these credentials to authorise this project for those packages. Other projects are never given access through them.',
         ]);
 });
 
